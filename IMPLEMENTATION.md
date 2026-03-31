@@ -95,6 +95,7 @@ with each other?*
 │  Tier 0: hash dedup + entity exact-match │
 │  Tier 1: NLI cross-encoder (local)       │
 │  Tier 2: numeric/temporal rules          │
+│  Tier 2b: cross-scope entity detection   │
 │  Tier 3: LLM escalation (rare)           │
 ├──────────────────────────────────────────┤
 │          Storage Layer (SQLite)          │  ← durable append-only log
@@ -505,6 +506,7 @@ windows are future work.
 | `rank_bm25` | Lexical retrieval | Negation blindness fix |
 | `numpy` | Cosine similarity | No extra dep |
 | `datasketch` | MinHash for entity dedup | Round 4: replaces LLM-only entity resolution |
+| small NER model (e.g. `dslim/bert-base-NER`) | Entity extraction fallback | Catches what regex misses; ~50ms, local |
 
 **Transport:** Streamable HTTP (MCP spec v2025-03-26+) is the default for remote
 deployment. Local/CLI use is `stdio`. The legacy `HTTP+SSE` transport (2024-11-05 spec)
@@ -542,9 +544,42 @@ sufficient.
 3. **Dedup check:** `SELECT id FROM facts WHERE content_hash = ? AND valid_until IS NULL AND scope = ?`.
    If found, return `{fact_id: existing_id, duplicate: true}`. O(1) — no model inference.
 4. Generate embedding for `content`
-5. Extract `keywords` and `entities` via a lightweight local model or rule-based extractor.
-   Entity extraction is mandatory even without LLM — a regex/rule engine can extract
-   numerics, version numbers, and capitalized service names from codebase facts reliably.
+5. Extract `keywords` and `entities` via a **hybrid extraction pipeline**.
+   Entity extraction is the foundation of Tier 0 detection and must have high recall.
+   
+   **Why regex alone is insufficient:** The plan previously stated "a regex/rule engine
+   can extract numerics, version numbers, and capitalized service names reliably." This
+   is the most fragile assumption in the entire design. Natural language codebase facts
+   use varied phrasing: "about a thousand requests per second," "1k/s," "bumped from
+   30 to 60 seconds," "doesn't use rate limiting." Regex catches clean patterns like
+   `\d+\s*req/s` but misses written-out numbers, abbreviations, multi-value sentences,
+   and negation of entity existence. Low entity recall means Tier 0 fires rarely, and
+   the system silently falls through to NLI for contradictions that should have been
+   caught deterministically.
+   
+   **Hybrid extraction (ordered by cost):**
+   
+   a. **Regex pass (< 1ms):** Extract obvious patterns — bare numbers with units
+      (`100 req/s`, `v3.2.1`, `port 5432`), ALL_CAPS identifiers (`AUTH_RATE_LIMIT`,
+      `JWT_SECRET`), and known service name patterns. This catches ~40-60% of entities
+      in well-structured facts.
+   
+   b. **Lightweight NER model pass (< 50ms):** Run a small token-classification model
+      (e.g., a fine-tuned distilbert or the `sentence-transformers` NER head) to catch
+      entities the regex missed — written-out numbers ("a thousand"), abbreviations
+      ("1k"), service names in natural phrasing ("the auth service"), and negation
+      contexts ("does not use X"). This lifts recall to ~80-90%.
+   
+   c. **LLM extraction (optional, on commit if available):** For high-stakes scopes
+      or when the lightweight model's confidence is low, use the Tier 3 LLM to extract
+      structured entities. This is the same LLM already available for conflict
+      escalation, reused for a different purpose.
+   
+   The extraction result is stored in the `entities` JSON column. If extraction fails
+   or returns empty, the fact is still committed — it just won't benefit from Tier 0
+   detection and will rely on Tier 1 NLI instead. Extraction quality improves over time
+   as the team's AGENTS.md template guides agents to write well-structured facts with
+   explicit numeric values and service names.
 6. Determine `lineage_id`: if `source_lineage_id` is provided, inherit it (this is a
    correction of an existing fact). Otherwise, generate a new UUID.
 7. If correcting an existing fact: `UPDATE facts SET valid_until = NOW() WHERE lineage_id = source_lineage_id AND valid_until IS NULL`
@@ -688,6 +723,35 @@ For each candidate pair already in the candidate set:
 - **Temporal:** Conflicting temporal claims about the same entity:
   "X was deprecated in Q1" vs "X is current" → flag with `detection_tier = 'tier2_temporal'`
 
+**Tier 2b — Cross-Scope Entity Contradiction (<50ms, parallel with Tiers 1-2)**
+
+This addresses the most dangerous blind spot in the original design: contradictions
+that span scopes. The entire detection pipeline previously filtered by `scope`, meaning
+"The payments service uses PostgreSQL" (scope: `payments`) would never be compared
+against "All services use MySQL" (scope: `infra/database`). These cross-scope
+contradictions are the hardest to catch and the most damaging when missed.
+
+For `f_new`, query the `entities` column across ALL scopes (not just `f_new.scope`):
+
+```sql
+SELECT f.id, f.scope FROM facts f, json_each(f.entities) e
+WHERE f.valid_until IS NULL
+  AND f.id != ?
+  AND e.value->>'name' = ?
+  AND e.value->>'type' = ?
+  AND (e.value->>'value' IS NULL OR e.value->>'value' != ?)
+```
+
+If a cross-scope entity match is found, add it to the Tier 1 NLI candidate set
+regardless of embedding similarity or BM25 score. The NLI model then determines
+whether the cross-scope pair actually contradicts.
+
+This is cheap because it's a single indexed query on the `entities` JSON column,
+and it catches the class of contradictions that scope-filtered detection misses
+entirely. Cross-scope conflicts are flagged with `detection_tier = 'tier2b_cross_scope'`
+and default to `severity = 'high'` (if two scopes disagree about the same entity,
+that's almost always a real problem).
+
 **Tier 3 — LLM Escalation (~2000ms, rare)**
 
 Invoked only when:
@@ -731,6 +795,7 @@ When `f_new` and `f_candidate` share the same `lineage_id` and NLI entailment > 
 |---|---|
 | Tier 0 entity conflict (numeric/config key) | high |
 | Tier 2 numeric conflict | high |
+| Tier 2b cross-scope entity conflict | high |
 | Tier 1 NLI > 0.85, different engineers | high |
 | Tier 1 NLI > 0.85, same engineer | medium |
 | Tier 3 LLM confirmed, any | medium |
@@ -995,6 +1060,31 @@ structural prerequisite for Phase 2 being usable under any real load.
 - Embedding model + version stored with each fact.
 - Re-indexing tool provided.
 - At startup, validate configured model against newest rows.
+
+### 9. Regex Entity Extraction Recall Failure (CRITICAL — Addressed in Round 5)
+- **Failure:** The plan assumed "a regex/rule engine can extract numerics, version
+  numbers, and capitalized service names from codebase facts reliably." This is false.
+  Natural language codebase facts use written-out numbers ("a thousand"), abbreviations
+  ("1k/s"), multi-value sentences ("bumped from 30 to 60"), and negation ("doesn't use
+  rate limiting"). Regex catches clean patterns but misses the majority of entities in
+  natural prose. Since Tier 0 (the highest-confidence detection tier) depends entirely
+  on entity extraction, low recall means the most reliable detection path fires rarely,
+  silently falling through to the less reliable NLI path.
+- **Mitigation:** Hybrid extraction pipeline: regex first (< 1ms, catches ~40-60%),
+  then lightweight NER model (< 50ms, lifts to ~80-90%), with optional LLM extraction
+  for high-stakes scopes. The AGENTS.md template also guides agents to write
+  well-structured facts with explicit values, improving extraction quality at the source.
+
+### 10. Cross-Scope Contradictions Invisible to Detection (CRITICAL — Addressed in Round 5)
+- **Failure:** The entire detection pipeline filtered candidates by `scope`. This means
+  "The payments service uses PostgreSQL" (scope: `payments`) is never compared against
+  "All services use MySQL" (scope: `infra/database`). Cross-scope contradictions are
+  the most dangerous class — they represent systemic misunderstandings about the
+  codebase, not local disagreements — and the system was completely blind to them.
+- **Mitigation:** Tier 2b cross-scope entity detection queries the `entities` column
+  across all scopes. When the same entity name appears in different scopes with
+  different values, the pair is injected into the NLI candidate set for semantic
+  comparison. Cross-scope conflicts default to `severity = 'high'`.
 
 ---
 
