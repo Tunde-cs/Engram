@@ -1,10 +1,13 @@
 {
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
+  "framework": null,
+  "installCommand": "pip install starlette",
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "functions": {
+    "api/index.py": {
+      "excludeFiles": "{src/**,tests/**,papers/**,assets/**,.pytest_cache/**}"
     }
-  ],
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
   ]
