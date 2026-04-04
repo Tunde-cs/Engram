@@ -382,11 +382,14 @@ def _render_landing() -> str:
   <script>
     function copyCode(id) {
       const el = document.getElementById(id);
-      const text = el.textContent.replace(/\n/g, ' && ').trim();
+      const text = el.textContent.replace(/<br>/g, ' && ').trim();
       navigator.clipboard.writeText(text).then(() => {
-        const btn = event.target;
+        const btn = document.querySelector('.copy-btn');
+        const originalText = btn.textContent;
         btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 2000);
+        setTimeout(() => btn.textContent = originalText, 2000);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
       });
     }
   </script>
