@@ -79,6 +79,18 @@ class BaseStorage(ABC):
         ...
 
     @abstractmethod
+    async def retire_stale_facts(self) -> int:
+        """Retire stale, low-value facts via importance-based decay.
+
+        Targets:
+        1. Unverified inferences older than 30 days
+        2. Unverified, uncorroborated observations older than 90 days
+        Decisions and facts with provenance or corroboration are protected.
+        Returns count of retired facts.
+        """
+        ...
+
+    @abstractmethod
     async def find_entity_conflicts(
         self, entity_name: str, entity_type: str, entity_value: str, scope: str, exclude_id: str
     ) -> list[dict]: ...
@@ -445,6 +457,39 @@ class SQLiteStorage(BaseStorage):
         )
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
+
+    async def retire_stale_facts(self) -> int:
+        """Retire stale, low-value facts via importance-based decay."""
+        now = _now_iso()
+        total = 0
+
+        # 1. Unverified inferences older than 30 days
+        cursor = await self.db.execute(
+            """UPDATE facts SET valid_until = ?
+               WHERE valid_until IS NULL
+                 AND fact_type = 'inference'
+                 AND provenance IS NULL
+                 AND corroborating_agents = 0
+                 AND datetime(committed_at, '+30 days') < ?""",
+            (now, now),
+        )
+        total += cursor.rowcount
+        await self.db.commit()
+
+        # 2. Unverified, uncorroborated observations older than 90 days
+        cursor = await self.db.execute(
+            """UPDATE facts SET valid_until = ?
+               WHERE valid_until IS NULL
+                 AND fact_type = 'observation'
+                 AND provenance IS NULL
+                 AND corroborating_agents = 0
+                 AND datetime(committed_at, '+90 days') < ?""",
+            (now, now),
+        )
+        total += cursor.rowcount
+        await self.db.commit()
+
+        return total
 
     # ── Entity-based lookups (for Tier 0 / Tier 2b detection) ────────
 

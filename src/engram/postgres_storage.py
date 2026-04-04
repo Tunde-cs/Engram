@@ -251,6 +251,39 @@ class PostgresStorage(BaseStorage):
             )
         return [_row_to_dict(r) for r in rows]
 
+    async def retire_stale_facts(self) -> int:
+        """Retire stale, low-value facts via importance-based decay."""
+        now = _now_ts()
+        total = 0
+        async with self.pool.acquire() as conn:
+            # 1. Unverified inferences older than 30 days
+            result = await conn.execute(
+                "UPDATE facts SET valid_until = $1 "
+                "WHERE valid_until IS NULL "
+                "AND fact_type = 'inference' "
+                "AND provenance IS NULL "
+                "AND corroborating_agents = 0 "
+                "AND workspace_id = $2 "
+                "AND committed_at + INTERVAL '30 days' < $1",
+                now, self.workspace_id,
+            )
+            total += int(result.split()[-1])
+
+            # 2. Unverified, uncorroborated observations older than 90 days
+            result = await conn.execute(
+                "UPDATE facts SET valid_until = $1 "
+                "WHERE valid_until IS NULL "
+                "AND fact_type = 'observation' "
+                "AND provenance IS NULL "
+                "AND corroborating_agents = 0 "
+                "AND workspace_id = $2 "
+                "AND committed_at + INTERVAL '90 days' < $1",
+                now, self.workspace_id,
+            )
+            total += int(result.split()[-1])
+
+        return total
+
     # ── Entity-based lookups ─────────────────────────────────────────
 
     async def find_entity_conflicts(

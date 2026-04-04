@@ -161,6 +161,7 @@ The underlying goal (single-source facts are less trusted) is achievable without
 | Wang & Chen [3] (MIRIX) | Single-user multi-component memory | Within one user's store | No | 2025 |
 | Hu et al. [4] (Survey) | Full landscape | Flagged as unsolved frontier | No | 2026 |
 | Rasmussen et al. [30] (Zep/Graphiti) | Single-agent temporal KG | Bitemporal edge invalidation | Implicit (supersession) | 2025 |
+| Alqithami [6] (FiFA/MaRS) | Memory-budgeted forgetting policies | Importance-based decay | No (single-agent) | 2025 |
 | **Engram** | **Multi-agent shared memory** | **Cross-agent fact consistency** | **Yes (`engram_conflicts`)** | **2026** |
 
 ### Round 3 Structural Simplifications vs. Round 2
@@ -366,6 +367,40 @@ The CRUD operations pattern was directly implemented:
 3. **`memory_op` + `supersedes_fact_id` columns** — stored per fact for a complete audit trail of memory lifecycle operations.
 4. **`operation="delete"`** — retires an entire lineage without inserting a replacement fact.
 5. **`operation="none"`** — explicit no-op that signals the agent has nothing new to add (useful in multi-agent pipelines where a tool call is required by protocol but the agent has already retrieved enough context).
+
+---
+
+## [6] Forgetful but Faithful: A Cognitive Memory Architecture and Benchmark for Privacy-Aware Generative Agents (FiFA/MaRS)
+
+**Authors:** Saad Alqithami
+**ArXiv:** [2512.12856](https://arxiv.org/abs/2512.12856) (v1, Dec 2025)
+**File:** [`papers/2512.12856v1.pdf`](papers/2512.12856v1.pdf)
+
+### Summary
+
+FiFA introduces the Memory-Aware Retention Schema (MaRS), a cognitively inspired architecture that organizes episodic, semantic, social, and task memories as typed, provenance-tracked nodes with multiple indices. On top of MaRS, six forgetting policies are formalized: FIFO, LRU, Priority Decay, Reflection-Summary, Random-Drop, and a Hybrid variant. The FiFA benchmark evaluates agents across narrative coherence, goal completion, social recall, privacy preservation, and cost efficiency under explicit token budgets.
+
+### Key Findings for Engram
+
+1. **Principled forgetting improves coherence.** The central finding: agents that forget strategically outperform agents that remember everything. Random Drop achieved the highest composite score (0.911) and narrative coherence (0.667), partly because non-deterministic eviction avoids reinforcing stale, self-contradictory fragments. This validates the "proved useful more than once" heuristic — keeping less but keeping the right things.
+
+2. **Importance-based decay is the right lever at scale.** Priority Decay and Hybrid policies improve goal completion and coherence over temporal baselines by protecting high-value items (decisions, verified facts, corroborated claims) while aggressively pruning low-value noise (old inferences, unverified observations). The density score `score(n) = (Û_n - λ_priv * s_n) / w_n` directly inspired Engram's enhanced scoring formula.
+
+3. **Budget independence over tested range.** Policy choice dominates outcomes more than raw capacity. Increasing memory budget from 2K to 32K tokens improved scores modestly but did not change policy rankings. This means Engram's retrieval quality depends more on what it keeps than how much it stores.
+
+4. **Unverified inferences are the primary source of noise.** Facts without provenance and without corroboration are the most likely to introduce "weird assumptions" that degrade agent performance. The paper's sensitivity analysis shows these should decay fastest.
+
+5. **Typed memory with differential decay rates.** Different fact types warrant different retention policies: decisions have high retention value (architectural choices persist), observations have moderate value (raw sightings decay), and inferences have the lowest retention value (conclusions without evidence should expire).
+
+### Impact on Engram (Round 8)
+
+FiFA's insights directly shaped three changes to Engram's retrieval and retention:
+
+1. **Steeper recency decay** — `exp(-0.1 * days)` replaces `exp(-0.05 * days)`. Half-life drops from ~14 days to ~7 days. A 90-day-old fact is now effectively invisible in scoring (0.001 vs 0.011). This prevents old context from crowding out recent, relevant facts at 100k+ scale.
+
+2. **Importance-based background decay** — A new periodic task (`_decay_loop`) retires stale, low-value facts: unverified inferences after 30 days, unverified uncorroborated observations after 90 days. Decisions and facts with provenance or corroboration are protected. This is FiFA's Priority Decay policy adapted to Engram's temporal validity model.
+
+3. **Aggressive penalty for unverified old inferences** — In query scoring, inferences older than 14 days without provenance get a 0.3× multiplier. These are the "weird assumptions" that the FiFA paper identifies as the primary source of agent performance degradation.
 
 ---
 

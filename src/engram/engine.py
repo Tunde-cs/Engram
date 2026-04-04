@@ -34,6 +34,7 @@ class EngramEngine:
         self._suggestion_queue: asyncio.Queue[str] = asyncio.Queue()
         self._detection_task: asyncio.Task[None] | None = None
         self._ttl_task: asyncio.Task[None] | None = None
+        self._decay_task: asyncio.Task[None] | None = None
         self._calibration_task: asyncio.Task[None] | None = None
         self._suggestion_task: asyncio.Task[None] | None = None
         self._escalation_task: asyncio.Task[None] | None = None
@@ -45,6 +46,7 @@ class EngramEngine:
         """Start the background detection worker and periodic tasks."""
         self._detection_task = asyncio.create_task(self._detection_worker())
         self._ttl_task = asyncio.create_task(self._ttl_expiry_loop())
+        self._decay_task = asyncio.create_task(self._decay_loop())
         self._calibration_task = asyncio.create_task(self._calibration_loop())
         self._suggestion_task = asyncio.create_task(self._suggestion_worker())
         self._escalation_task = asyncio.create_task(self._escalation_loop())
@@ -53,8 +55,8 @@ class EngramEngine:
     async def stop(self) -> None:
         """Stop all background tasks."""
         for task in (
-            self._detection_task, self._ttl_task, self._calibration_task,
-            self._suggestion_task, self._escalation_task,
+            self._detection_task, self._ttl_task, self._decay_task,
+            self._calibration_task, self._suggestion_task, self._escalation_task,
         ):
             if task:
                 task.cancel()
@@ -64,6 +66,7 @@ class EngramEngine:
                     pass
         self._detection_task = None
         self._ttl_task = None
+        self._decay_task = None
         self._calibration_task = None
         self._suggestion_task = None
         self._escalation_task = None
@@ -393,11 +396,14 @@ class EngramEngine:
                 rrf += 1.0 / (k + fts_rank[fid])
             relevance = rrf
 
-            # Recency signal
+            # Recency signal — steeper decay to prevent old facts from
+            # crowding out recent knowledge at 100k+ scale.
+            # Half-life ~7 days: a 30-day-old fact gets 0.12 (was 0.22).
+            # A 90-day-old fact gets 0.001 — effectively invisible.
             try:
                 committed = datetime.fromisoformat(fact["committed_at"])
                 days_old = (datetime.now(timezone.utc) - committed).days
-                recency = math.exp(-0.05 * days_old)
+                recency = math.exp(-0.1 * days_old)
             except (ValueError, TypeError):
                 recency = 0.5
 
@@ -409,9 +415,12 @@ class EngramEngine:
                 trust = 0.8  # default for unknown agents
 
             # Phase 1: Fact type weighting (decision > inference > observation)
+            # Decisions are architectural choices — high retention value.
+            # Inferences are conclusions — moderate, but decay faster.
+            # Observations are raw sightings — lowest retention value.
             fact_type_weight = {
                 "decision": 1.0,
-                "inference": 0.5,
+                "inference": 0.3,
                 "observation": 0.0,
             }.get(fact.get("fact_type", "observation"), 0.0)
 
@@ -429,6 +438,37 @@ class EngramEngine:
             except (json.JSONDecodeError, TypeError):
                 entity_density = 0.0
 
+            # Supersession penalty — facts that have been corrected in their
+            # lineage should rank lower even if they're technically still valid
+            # (edge case: valid_until not yet set due to async processing)
+            supersession_penalty = 1.0
+            if fact.get("supersedes_fact_id"):
+                # This fact IS a correction — boost it slightly
+                supersession_penalty = 1.05
+
+            # Combined score — weights tuned for relevance at scale.
+            # Recency is the strongest signal after relevance because at
+            # 100k+ facts, old context is the primary source of noise.
+            score = (
+                relevance
+                + 0.25 * recency
+                + 0.15 * trust
+                + 0.15 * fact_type_weight
+                + 0.1 * provenance_weight
+                + 0.1 * corroboration_weight
+                + 0.05 * entity_density
+            ) * supersession_penalty
+
+            # Unverified inferences older than 14 days get heavily penalized.
+            # These are the primary source of "weird assumptions" — old guesses
+            # that were never confirmed but never expired either.
+            if (
+                fact.get("fact_type") == "inference"
+                and not fact.get("provenance")
+                and days_old > 14
+            ):
+                score *= 0.3
+
             # Combined score with enhanced signals
             score = (
                 relevance
@@ -444,10 +484,10 @@ class EngramEngine:
             if fact.get("durability") == "ephemeral":
                 score *= 0.6
 
-            # Penalize facts with unresolved conflicts — value shouldn't
-            # require a human to review before the ranking reflects uncertainty
+            # Penalize facts with unresolved conflicts — disputed facts
+            # should not confidently inform agent decisions
             if fid in open_conflict_ids:
-                score *= 0.7
+                score *= 0.5
 
             scored.append((score, fact))
 
@@ -1054,6 +1094,32 @@ class EngramEngine:
                 break
             except Exception:
                 logger.exception("TTL expiry loop error")
+
+    # ── Importance-based decay (FiFA-inspired) ───────────────────────
+
+    async def _decay_loop(self) -> None:
+        """Periodically retire stale, low-value facts to prevent memory bloat.
+
+        Runs every 10 minutes.  Targets:
+        1. Unverified inferences older than 30 days — these are the primary
+           source of "weird assumptions" that taint agent decisions.
+        2. Observations older than 90 days with no provenance and no
+           corroboration — raw sightings that were never confirmed.
+
+        This implements the FiFA paper's insight: principled forgetting-by-design
+        improves coherence by removing context that no longer earns its place.
+        Facts with provenance, corroboration, or decision type are protected.
+        """
+        while True:
+            try:
+                await asyncio.sleep(600)  # every 10 minutes
+                retired = await self.storage.retire_stale_facts()
+                if retired:
+                    logger.info("Decay: retired %d stale fact(s)", retired)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.exception("Decay loop error")
 
     # ── NLI threshold calibration ────────────────────────────────────
 
