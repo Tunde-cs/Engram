@@ -276,6 +276,93 @@ _ENGRAM_MCP_ENTRY = {
     "args": ["engram-team@latest"],
 }
 
+# ── Agent steering / instructions ────────────────────────────────────
+# After writing the MCP config, we also write agent instruction files so
+# the LLM knows what Engram is and how to use it without the user having
+# to explain.  Each IDE has its own convention for persistent agent rules.
+
+_ENGRAM_AGENT_INSTRUCTIONS = """\
+# Engram — Shared Team Memory
+
+You have access to an MCP tool called **Engram**. It gives you a shared
+memory layer so every agent on the team sees the same verified facts.
+
+## On every new session
+1. Call `engram_status()` first. Read the `next_prompt` field and follow it.
+2. If status is `ready`, call `engram_query("<topic>")` before starting
+   any task to see what the team already knows.
+
+## While working
+- After verifying a non-obvious discovery (hidden side-effect, config
+  detail, failed approach, architectural decision), call `engram_commit`.
+- Before architectural decisions, call `engram_conflicts()` to check for
+  disputed facts.
+
+## Rules
+- Only commit facts you have verified — never speculative claims.
+- Do not include secrets, API keys, or passwords in commits.
+- Batch related discoveries into one commit (max 5 commits per task).
+- Do not call `engram_query` more than 3 times per task.
+"""
+
+# Map of IDE name → list of (file_path, content_or_callable) for steering.
+# Paths are relative to the user's home directory or absolute.
+# We only write to IDEs that were detected (config file exists).
+_STEERING_LOCATIONS: dict[str, list[tuple[Path, str]]] = {
+    "Kiro": [
+        (Path.home() / ".kiro" / "steering" / "engram.md", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+    "Claude Code": [
+        (Path.home() / ".claude" / "CLAUDE.md", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+    "Cursor": [
+        (Path.home() / ".cursor" / "rules" / "engram.mdc", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+    "Windsurf": [
+        (Path.home() / ".codeium" / "windsurf" / "rules" / "engram.md", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+    "Codex": [
+        (Path.home() / ".codex" / "AGENTS.md", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+    "VS Code (Copilot)": [
+        (Path.home() / ".github" / "copilot-instructions.md", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+    "Amazon Q Developer CLI": [
+        (Path.home() / ".aws" / "amazonq" / "rules" / "engram.md", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+    "Gemini CLI": [
+        (Path.home() / ".gemini" / "GEMINI.md", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+    "GitHub Copilot CLI": [
+        (Path.home() / ".copilot" / "instructions.md", _ENGRAM_AGENT_INSTRUCTIONS),
+    ],
+}
+
+
+def _write_steering(client_name: str, dry_run: bool) -> list[str]:
+    """Write agent instruction files for a detected IDE. Returns list of written paths."""
+    written = []
+    locations = _STEERING_LOCATIONS.get(client_name, [])
+    for file_path, content in locations:
+        try:
+            if file_path.exists():
+                existing = file_path.read_text()
+                if "engram" in existing.lower() and "engram_status" in existing:
+                    continue  # already has engram instructions
+                # Append to existing file
+                if not dry_run:
+                    with open(file_path, "a") as f:
+                        f.write("\n\n" + content)
+                written.append(str(file_path))
+            else:
+                if not dry_run:
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_text(content)
+                written.append(str(file_path))
+        except Exception:
+            pass
+    return written
+
 
 @main.command()
 @click.option("--dry-run", is_flag=True, help="Show what would be changed without writing.")
@@ -284,6 +371,7 @@ def install(dry_run: bool) -> None:
     added = []
     skipped = []
     not_found = []
+    steering_written = []
 
     for client_name, info in _MCP_CLIENTS.items():
         config_path: Path = info["path"]
@@ -305,6 +393,8 @@ def install(dry_run: bool) -> None:
                     
                     if "engram" in servers:
                         skipped.append(client_name)
+                        # Still write steering if missing
+                        steering_written.extend(_write_steering(client_name, dry_run))
                         continue
                     
                     servers["engram"] = {
@@ -317,6 +407,7 @@ def install(dry_run: bool) -> None:
                         config_path.write_text(tomli_w.dumps(data))
                     
                     added.append(client_name)
+                    steering_written.extend(_write_steering(client_name, dry_run))
                 except ImportError:
                     click.echo(f"Warning: tomli/tomli_w not installed, skipping {client_name}")
                     continue
@@ -327,6 +418,8 @@ def install(dry_run: bool) -> None:
 
                 if "engram" in servers:
                     skipped.append(client_name)
+                    # Still write steering if missing
+                    steering_written.extend(_write_steering(client_name, dry_run))
                     continue
 
                 servers["engram"] = _ENGRAM_MCP_ENTRY
@@ -336,6 +429,7 @@ def install(dry_run: bool) -> None:
                     config_path.write_text(json.dumps(data, indent=2))
 
                 added.append(client_name)
+                steering_written.extend(_write_steering(client_name, dry_run))
         except Exception as e:
             click.echo(f"Warning: Failed to process {client_name}: {e}")
             continue
@@ -347,6 +441,8 @@ def install(dry_run: bool) -> None:
         click.echo(f"✓ Engram added to: {', '.join(added)}")
     if skipped:
         click.echo(f"⊙ Already configured: {', '.join(skipped)}")
+    if steering_written:
+        click.echo(f"📝 Agent instructions written to: {', '.join(steering_written)}")
     if not_found:
         click.echo(f"⊘ Not installed (skipped): {', '.join(not_found)}")
 
