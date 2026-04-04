@@ -65,7 +65,6 @@ Agent: "Add your database connection string to your environment:
 Agent: "Your team workspace is ready.
 
         Share with teammates:
-          Team ID:    ENG-X7K2-P9M4
           Invite Key: ek_live_abc123...
 
         That's all they need.
@@ -75,12 +74,10 @@ Agent: "Your team workspace is ready.
 **Joining a workspace (teammate):**
 
 ```
-Agent: "Do you have a Team ID or are you setting up a new one?"
+Agent: "Do you have an Invite Key to join an existing workspace,
+        or are you setting up a new one?"
 
 You:   "Join"
-
-Agent: "What's your Team ID?"
-You:   "ENG-X7K2-P9M4"
 
 Agent: "What's your Invite Key?"
 You:   "ek_live_abc123..."
@@ -88,7 +85,7 @@ You:   "ek_live_abc123..."
 Agent: "You're in. I'll query team memory before starting any task."
 ```
 
-Teammates only need two strings — the Team ID and Invite Key. The database connection is encrypted inside the invite key and extracted automatically. No one except the workspace founder ever sees or handles a database URL.
+Teammates only need one thing — the Invite Key. The workspace ID and database connection are encrypted inside it and extracted automatically. No one except the workspace founder ever sees or handles a database URL.
 
 **Every session after that:** the agent connects silently, queries before every task, commits after every discovery. Engram is invisible infrastructure.
 
@@ -117,7 +114,7 @@ Engram exposes seven MCP tools. The first three handle setup; the last four are 
 |---|---|
 | `engram_status` | Check setup state. Returns `next_prompt` — the agent says it to you. |
 | `engram_init` | Create a new workspace (founder). Generates Team ID + Invite Key. |
-| `engram_join` | Join a workspace with Team ID + Invite Key. Extracts db URL automatically. |
+| `engram_join` | Join a workspace with just an Invite Key. Extracts workspace ID + db URL automatically. |
 | `engram_query` | Pull what your team's agents collectively know about a topic. |
 | `engram_commit` | Persist a verified discovery — fact, constraint, decision, failed approach. |
 | `engram_conflicts` | Surface pairs of facts that semantically contradict each other. |

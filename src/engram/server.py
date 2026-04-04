@@ -102,7 +102,7 @@ async def engram_status() -> dict[str, Any]:
             "status": "db_url_detected",
             "next_prompt": (
                 "I can see a database connection string in your environment. "
-                "Do you have a Team ID to join an existing workspace, "
+                "Do you have an Invite Key to join an existing workspace, "
                 "or are you setting up a new one?"
             ),
         }
@@ -111,7 +111,7 @@ async def engram_status() -> dict[str, Any]:
         "status": "unconfigured",
         "next_prompt": (
             "Welcome to Engram — shared memory for your team's agents.\n\n"
-            "Do you have a Team ID to join an existing workspace, "
+            "Do you have an Invite Key to join an existing workspace, "
             "or are you setting up a new one?\n\n"
             "If setting up a new workspace, you'll need a PostgreSQL database "
             "connection string. You can get a free one at neon.tech, "
@@ -211,13 +211,13 @@ async def engram_init(
         "invite_key": invite_key,
         "next_prompt": (
             f"Your team workspace is ready.\n\n"
-            f"Share with teammates via iMessage, WhatsApp, Slack, or any channel:\n\n"
-            f"  Team ID:    {engram_id}\n"
+            f"Share this with teammates via iMessage, WhatsApp, Slack, or any channel:\n\n"
             f"  Invite Key: {invite_key}\n\n"
-            f"That's all they need — the invite key carries everything. "
-            f"They install Engram, start a chat, and their agent handles the rest.\n\n"
+            f"That's all they need. They install Engram, start a chat, paste the key, "
+            f"and their agent handles the rest.\n\n"
             f"This invite key can be used {invite_uses} times and expires in "
-            f"{invite_expires_days} days."
+            f"{invite_expires_days} days.\n\n"
+            f"Your workspace ID (for your own reference): {engram_id}"
         ),
     }
 
@@ -226,14 +226,13 @@ async def engram_init(
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False})
-async def engram_join(team_id: str, invite_key: str) -> dict[str, Any]:
-    """Join an existing Engram workspace using a Team ID and Invite Key.
+async def engram_join(invite_key: str) -> dict[str, Any]:
+    """Join an existing Engram workspace using only an Invite Key.
 
-    The invite key contains the database URL encrypted inside it —
-    no database string is needed from the user.
+    The invite key contains everything needed — the database URL and
+    workspace ID are encrypted inside it. No Team ID required.
 
     Parameters:
-    - team_id: The Team ID shared by the workspace founder (e.g. ENG-X7K2-P9M4).
     - invite_key: The invite key shared by the workspace founder (e.g. ek_live_...).
 
     Returns: {status, engram_id, next_prompt}
@@ -245,7 +244,7 @@ async def engram_join(team_id: str, invite_key: str) -> dict[str, Any]:
         write_workspace,
     )
 
-    # Decode the invite key (self-contained, no server lookup needed first)
+    # Decode the invite key — self-contained, no other input needed
     try:
         payload = decode_invite_key(invite_key)
     except ValueError as e:
@@ -254,16 +253,6 @@ async def engram_join(team_id: str, invite_key: str) -> dict[str, Any]:
             "next_prompt": (
                 f"That invite key isn't valid: {e}\n\n"
                 "Please double-check it with the person who set up the workspace."
-            ),
-        }
-
-    # Verify the Team ID matches what's in the key
-    if payload.get("engram_id", "").upper() != team_id.upper():
-        return {
-            "status": "error",
-            "next_prompt": (
-                "The Team ID doesn't match this invite key. "
-                "Make sure you copied both correctly."
             ),
         }
 
