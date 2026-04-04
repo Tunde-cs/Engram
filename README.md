@@ -1,6 +1,6 @@
 <div align="center">
 
-**Shared memory for your team's agents. Zero setup. You own your data.**
+**Shared memory for your team's agents. Works with any MCP-compatible IDE. You own your data.**
 
 <br />
 
@@ -39,8 +39,10 @@ When two agents develop incompatible beliefs about the same system, Engram detec
    pip install engram-team
    engram install
    ```
+   
+   Supports: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code (Cline/Roo/Copilot), Codex, and any MCP-compatible IDE.
 
-2. Restart your editor (Claude Code, Cursor, Windsurf, VS Code with Cline/Roo/Copilot, or Codex)
+2. Restart your MCP-compatible editor or IDE
 
 3. Open a new chat and ask your agent:
    ```

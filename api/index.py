@@ -19,7 +19,7 @@ def _render_landing() -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Engram — Shared memory for your team's agents</title>
-  <meta name="description" content="Shared memory for your team's agents. Zero setup. You own your data.">
+  <meta name="description" content="Shared memory for your team's agents. Works with any MCP-compatible IDE. You own your data.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -278,7 +278,7 @@ def _render_landing() -> str:
     <div class="container">
       <h1>Shared memory for<br>your team's agents</h1>
       <p class="subtitle">
-        Zero setup. You own your data. Your agents handle everything else.
+        Works with any MCP-compatible IDE. You own your data. Your agents handle everything else.
       </p>
     </div>
   </section>
@@ -300,7 +300,10 @@ def _render_landing() -> str:
           <div id="install-cmd-2">engram install</div>
         </div>
         <p class="note" style="margin-top: 1.5rem;">
-          2. Restart your editor (Claude Code, Cursor, or Windsurf)
+          2. Restart your MCP-compatible editor or IDE
+        </p>
+        <p class="note" style="margin-top: 0.5rem; font-size: 0.85rem; color: #5a8a5a;">
+          Supports: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code (Cline/Roo/Copilot), Codex, and more
         </p>
         <p class="note" style="margin-top: 1rem;">
           3. Open a new chat and ask your agent:
