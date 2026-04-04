@@ -36,13 +36,34 @@ _MCP_CLIENTS = {
         "path": Path.home() / ".claude" / "settings.json",
         "key": "mcpServers",
     },
+    "Claude Desktop": {
+        "path": Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json",
+        "key": "mcpServers",
+    },
     "Cursor": {
         "path": Path.home() / ".cursor" / "mcp.json",
         "key": "mcpServers",
     },
     "Windsurf": {
-        "path": Path.home() / ".codeium" / "windsurf" / "mcp_settings.json",
+        "path": Path.home() / ".codeium" / "windsurf" / "mcp_config.json",
         "key": "mcpServers",
+    },
+    "Cline (VS Code)": {
+        "path": Path.home() / ".vscode" / "globalStorage" / "saoudrizwan.claude-dev" / "settings" / "cline_mcp_settings.json",
+        "key": "mcpServers",
+    },
+    "Roo Code (VS Code)": {
+        "path": Path.home() / ".vscode" / "globalStorage" / "rooveterinaryinc.roo-cline" / "settings" / "cline_mcp_settings.json",
+        "key": "mcpServers",
+    },
+    "VS Code (Copilot)": {
+        "path": Path.home() / ".vscode" / "mcp.json",
+        "key": "mcpServers",
+    },
+    "Codex": {
+        "path": Path.home() / ".codex" / "config.toml",
+        "key": "mcp_servers",  # TOML format
+        "format": "toml",
     },
 }
 
@@ -63,47 +84,76 @@ def install(dry_run: bool) -> None:
     for client_name, info in _MCP_CLIENTS.items():
         config_path: Path = info["path"]
         key: str = info["key"]
+        fmt = info.get("format", "json")
 
         if not config_path.exists():
             not_found.append(client_name)
             continue
 
         try:
-            data = json.loads(config_path.read_text())
-        except Exception:
-            data = {}
+            if fmt == "toml":
+                # Handle TOML format (Codex)
+                try:
+                    import tomli
+                    import tomli_w
+                    data = tomli.loads(config_path.read_text())
+                    servers = data.setdefault(key, {})
+                    
+                    if "engram" in servers:
+                        skipped.append(client_name)
+                        continue
+                    
+                    servers["engram"] = {
+                        "command": "uvx",
+                        "args": ["engram-team@latest"],
+                    }
+                    
+                    if not dry_run:
+                        config_path.parent.mkdir(parents=True, exist_ok=True)
+                        config_path.write_text(tomli_w.dumps(data))
+                    
+                    added.append(client_name)
+                except ImportError:
+                    click.echo(f"Warning: tomli/tomli_w not installed, skipping {client_name}")
+                    continue
+            else:
+                # Handle JSON format
+                data = json.loads(config_path.read_text())
+                servers = data.setdefault(key, {})
 
-        servers = data.setdefault(key, {})
+                if "engram" in servers:
+                    skipped.append(client_name)
+                    continue
 
-        if "engram" in servers:
-            skipped.append(client_name)
+                servers["engram"] = _ENGRAM_MCP_ENTRY
+
+                if not dry_run:
+                    config_path.parent.mkdir(parents=True, exist_ok=True)
+                    config_path.write_text(json.dumps(data, indent=2))
+
+                added.append(client_name)
+        except Exception as e:
+            click.echo(f"Warning: Failed to process {client_name}: {e}")
             continue
-
-        servers["engram"] = _ENGRAM_MCP_ENTRY
-
-        if not dry_run:
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            config_path.write_text(json.dumps(data, indent=2))
-
-        added.append(client_name)
 
     # Also try Claude Code CLI if available
     _try_claude_code_cli(dry_run, added, skipped)
 
     if added:
-        click.echo(f"Engram added to: {', '.join(added)}")
+        click.echo(f"✓ Engram added to: {', '.join(added)}")
     if skipped:
-        click.echo(f"Already configured: {', '.join(skipped)}")
+        click.echo(f"⊙ Already configured: {', '.join(skipped)}")
     if not_found:
-        click.echo(f"Not installed (skipped): {', '.join(not_found)}")
+        click.echo(f"⊘ Not installed (skipped): {', '.join(not_found)}")
 
     if added:
-        click.echo("\nRestart your editor and start a new chat — your agent will do the rest.")
+        click.echo("\n→ Restart your editor and ask your agent: 'Set up Engram for my team'")
     elif not added and not skipped:
         click.echo(
             "\nNo MCP clients detected. Add Engram manually:\n\n"
             '  {"mcpServers": {"engram": {"command": "uvx", "args": ["engram-team@latest"]}}}'
         )
+
 
 
 def _try_claude_code_cli(dry_run: bool, added: list, skipped: list) -> None:

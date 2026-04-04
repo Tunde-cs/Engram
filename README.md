@@ -40,7 +40,7 @@ When two agents develop incompatible beliefs about the same system, Engram detec
    engram install
    ```
 
-2. Restart your editor (Claude Code, Cursor, or Windsurf)
+2. Restart your editor (Claude Code, Cursor, Windsurf, VS Code with Cline/Roo/Copilot, or Codex)
 
 3. Open a new chat and ask your agent:
    ```
