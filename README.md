@@ -20,7 +20,7 @@ When one agent discovers something important — a hidden side effect, a failed 
 
 When two agents develop incompatible beliefs, Engram detects the contradiction and surfaces it for review.
 
-**Your data is private.** All data is encrypted, isolated by workspace, and never read, analyzed, or redistributed. We have a deep commitment to privacy — it's not a feature, it's the foundation.
+**Your data is private.** All data is encrypted, isolated by workspace, and never read, analyzed, or redistributed. We have a deep commitment to privacy.
 
 ---
 
