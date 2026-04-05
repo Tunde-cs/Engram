@@ -252,6 +252,17 @@ class BaseStorage(ABC):
     async def consume_invite_key(self, key_hash: str) -> None:
         """Decrement uses_remaining. Default no-op for local mode."""
 
+    async def get_key_generation(self, engram_id: str) -> int:
+        """Return the current key_generation for a workspace. Default 0."""
+        return 0
+
+    async def bump_key_generation(self, engram_id: str) -> int:
+        """Increment key_generation and return the new value. Default no-op."""
+        return 0
+
+    async def revoke_all_invite_keys(self, engram_id: str) -> None:
+        """Delete all invite keys for a workspace. Default no-op."""
+
 
 class SQLiteStorage(BaseStorage):
     """Async SQLite storage with WAL mode and FTS5."""
@@ -1023,6 +1034,27 @@ class SQLiteStorage(BaseStorage):
                SET uses_remaining = uses_remaining - 1
                WHERE key_hash = ? AND uses_remaining IS NOT NULL""",
             (key_hash,),
+        )
+        await self.db.commit()
+
+    async def get_key_generation(self, engram_id: str) -> int:
+        cursor = await self.db.execute(
+            "SELECT key_generation FROM workspaces WHERE engram_id = ?", (engram_id,)
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+    async def bump_key_generation(self, engram_id: str) -> int:
+        await self.db.execute(
+            "UPDATE workspaces SET key_generation = key_generation + 1 WHERE engram_id = ?",
+            (engram_id,),
+        )
+        await self.db.commit()
+        return await self.get_key_generation(engram_id)
+
+    async def revoke_all_invite_keys(self, engram_id: str) -> None:
+        await self.db.execute(
+            "DELETE FROM invite_keys WHERE engram_id = ?", (engram_id,)
         )
         await self.db.commit()
 

@@ -1,13 +1,14 @@
 """Engram MCP Server.
 
-Seven tools total:
-  engram_status    — check setup state; guides agent through onboarding
-  engram_init      — founder creates a new workspace (requires ENGRAM_DB_URL)
-  engram_join      — teammate joins an existing workspace via Team ID + Invite Key
-  engram_commit    — write a verified fact to shared memory
-  engram_query     — read what the team's agents collectively know
-  engram_conflicts — surface contradictions between facts
-  engram_resolve   — settle a disagreement
+Eight tools total:
+  engram_status           — check setup state; guides agent through onboarding
+  engram_init             — founder creates a new workspace (requires ENGRAM_DB_URL)
+  engram_join             — teammate joins an existing workspace via Invite Key
+  engram_reset_invite_key — creator resets the invite key after a security breach
+  engram_commit           — write a verified fact to shared memory
+  engram_query            — read what the team's agents collectively know
+  engram_conflicts        — surface contradictions between facts
+  engram_resolve          — settle a disagreement
 
 Tool descriptions embed behavioral guidance for the LLM.
 The 'next_prompt' field in onboarding responses tells the agent exactly what to say.
@@ -65,6 +66,32 @@ def set_rate_limiter(limiter: Any) -> None:
     _rate_limiter = limiter
 
 
+_DISCONNECTED_NEXT_PROMPT = (
+    "Your Engram client has been temporarily disconnected due to a security key reset.\n\n"
+    "The workspace creator has issued a new invite key. To reconnect:\n\n"
+    "1. Obtain the new invite key from your workspace creator.\n"
+    "2. Call engram_join with the new invite key.\n"
+    "3. Restart your MCP client (Claude Code / Claude Desktop / IDE extension).\n\n"
+    "Until you reconnect, Engram operations are suspended for your agent."
+)
+
+
+async def _check_key_generation(ws: Any) -> dict[str, Any] | None:
+    """Return a disconnected response if the local key_generation is behind the DB.
+
+    Returns None if the generation is current or the check cannot be performed.
+    """
+    if _storage is None or not ws or not ws.db_url:
+        return None
+    db_gen = await _storage.get_key_generation(ws.engram_id)
+    if db_gen > ws.key_generation:
+        return {
+            "status": "disconnected",
+            "next_prompt": _DISCONNECTED_NEXT_PROMPT,
+        }
+    return None
+
+
 # ── engram_status ─────────────────────────────────────────────────────
 
 
@@ -82,6 +109,9 @@ async def engram_status() -> dict[str, Any]:
     ws = read_workspace()
 
     if ws and ws.db_url:
+        disconnected = await _check_key_generation(ws)
+        if disconnected:
+            return disconnected
         return {
             "status": "ready",
             "mode": "team",
@@ -220,6 +250,8 @@ async def engram_init(
         schema=schema,
         anonymous_mode=anonymous_mode,
         anon_agents=anon_agents,
+        key_generation=0,
+        is_creator=True,
     )
     write_workspace(config)
     logger.info("Workspace initialized: %s (schema: %s, anonymous=%s)", engram_id, schema, anonymous_mode)
@@ -281,6 +313,7 @@ async def engram_join(invite_key: str) -> dict[str, Any]:
     db_url = payload["db_url"]
     engram_id = payload["engram_id"]
     schema = payload.get("schema", "engram")  # backward compatibility
+    key_generation = payload.get("key_generation", 0)
 
     # Server-side validation: check uses_remaining and expiry in the database
     key_hash = invite_key_hash(invite_key)
@@ -291,7 +324,7 @@ async def engram_join(invite_key: str) -> dict[str, Any]:
                 "status": "error",
                 "next_prompt": (
                     "This invite key has been revoked or used up. "
-                    "Ask the workspace admin to generate a new one."
+                    "Ask the workspace creator to generate a new one with engram_reset_invite_key."
                 ),
             }
         await _storage.consume_invite_key(key_hash)
@@ -303,9 +336,11 @@ async def engram_join(invite_key: str) -> dict[str, Any]:
         schema=schema,
         anonymous_mode=False,
         anon_agents=False,
+        key_generation=key_generation,
+        is_creator=False,
     )
     write_workspace(config)
-    logger.info("Joined workspace: %s (schema: %s)", engram_id, schema)
+    logger.info("Joined workspace: %s (schema: %s, generation: %d)", engram_id, schema, key_generation)
 
     return {
         "status": "joined",
@@ -316,6 +351,123 @@ async def engram_join(invite_key: str) -> dict[str, Any]:
             f"Engram tables are in the '{schema}' schema — isolated from your app.\n\n"
             "I'll query team knowledge before starting any task and commit "
             "discoveries after. You don't need to think about Engram — it's just there."
+        ),
+    }
+
+
+# ── engram_reset_invite_key ──────────────────────────────────────────
+
+
+@mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": True})
+async def engram_reset_invite_key(
+    invite_expires_days: int = 90,
+    invite_uses: int = 10,
+) -> dict[str, Any]:
+    """Reset the workspace invite key (workspace creator only).
+
+    Use this when you suspect a security breach or the current invite key
+    has been compromised. This will:
+      1. Revoke all existing invite keys for your workspace.
+      2. Increment the workspace key generation counter.
+      3. Generate a new invite key.
+
+    All existing members will be temporarily disconnected. They will see a
+    message telling them to obtain the new invite key and call engram_join.
+
+    This tool is only available to the workspace creator (the agent that
+    originally called engram_init). Other agents will receive an error.
+
+    Parameters:
+    - invite_expires_days: Validity period for the new key (default 90 days).
+    - invite_uses: Max number of times the new key can be used (default 10).
+
+    Returns: {status, invite_key, key_generation, next_prompt}
+    """
+    from engram.workspace import (
+        WorkspaceConfig,
+        generate_invite_key,
+        read_workspace,
+        write_workspace,
+    )
+
+    ws = read_workspace()
+    if ws is None or not ws.db_url:
+        return {
+            "status": "error",
+            "next_prompt": "No team workspace is configured. Only usable in team mode.",
+        }
+
+    if not ws.is_creator:
+        return {
+            "status": "error",
+            "next_prompt": (
+                "Only the workspace creator can reset the invite key. "
+                "If you set up this workspace, check that your workspace.json has is_creator=true."
+            ),
+        }
+
+    if _storage is None:
+        return {
+            "status": "error",
+            "next_prompt": "Storage not initialized. Restart the Engram server and try again.",
+        }
+
+    import time
+    from datetime import timezone
+
+    # Revoke all existing invite keys and bump the generation counter
+    await _storage.revoke_all_invite_keys(ws.engram_id)
+    new_gen = await _storage.bump_key_generation(ws.engram_id)
+
+    # Generate new invite key embedding the new generation
+    invite_key, key_hash = generate_invite_key(
+        db_url=ws.db_url,
+        engram_id=ws.engram_id,
+        expires_days=invite_expires_days,
+        uses_remaining=invite_uses,
+        schema=ws.schema,
+        key_generation=new_gen,
+    )
+
+    expires_ts = datetime.fromtimestamp(
+        time.time() + invite_expires_days * 86400, tz=timezone.utc
+    ).isoformat()
+    await _storage.insert_invite_key(
+        key_hash=key_hash,
+        engram_id=ws.engram_id,
+        expires_at=expires_ts,
+        uses_remaining=invite_uses,
+    )
+
+    # Update creator's local workspace.json with new generation
+    updated_config = WorkspaceConfig(
+        engram_id=ws.engram_id,
+        db_url=ws.db_url,
+        schema=ws.schema,
+        anonymous_mode=ws.anonymous_mode,
+        anon_agents=ws.anon_agents,
+        key_generation=new_gen,
+        is_creator=True,
+    )
+    write_workspace(updated_config)
+    logger.warning(
+        "Invite key reset by creator: workspace=%s, new_generation=%d", ws.engram_id, new_gen
+    )
+
+    return {
+        "status": "reset",
+        "invite_key": invite_key,
+        "key_generation": new_gen,
+        "next_prompt": (
+            f"Security reset complete. All existing invite keys have been revoked.\n\n"
+            f"Key generation is now {new_gen}. All members have been temporarily "
+            f"disconnected — they will see a message asking them to reconnect.\n\n"
+            f"Share this new invite key with your team via a secure channel "
+            f"(iMessage, WhatsApp, Slack DM, etc.):\n\n"
+            f"  Invite Key: {invite_key}\n\n"
+            f"Members rejoin by calling engram_join with this key, then restarting "
+            f"their MCP client. This key can be used {invite_uses} times and expires "
+            f"in {invite_expires_days} days."
         ),
     }
 
@@ -414,6 +566,13 @@ async def engram_commit(
     """
     engine = get_engine()
 
+    # Key generation check — block disconnected agents
+    from engram.workspace import read_workspace as _rw
+    _ws = _rw()
+    _disc = await _check_key_generation(_ws)
+    if _disc:
+        return _disc
+
     # Rate limiting (Phase 5)
     effective_agent = agent_id or "anonymous"
     if _rate_limiter is not None:
@@ -508,6 +667,13 @@ async def engram_query(
     and provenance metadata.
     """
     engine = get_engine()
+
+    # Key generation check — block disconnected agents
+    from engram.workspace import read_workspace as _rw
+    _ws = _rw()
+    _disc = await _check_key_generation(_ws)
+    if _disc:
+        return _disc
 
     # Scope read permission check when auth is enabled and scope is specified
     if _auth_enabled and _storage is not None and agent_id and scope:

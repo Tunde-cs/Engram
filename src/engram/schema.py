@@ -10,7 +10,7 @@ Two schemas are maintained:
 - POSTGRES_SCHEMA_SQL: PostgreSQL (team mode, asyncpg)
 """
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 # Incremental ALTER TABLE migrations keyed by target version.
 MIGRATIONS: dict[int, list[str]] = {
@@ -55,6 +55,10 @@ MIGRATIONS: dict[int, list[str]] = {
         # Ephemeral memory: durability tier + query hit tracking for auto-promotion
         "ALTER TABLE facts ADD COLUMN durability TEXT NOT NULL DEFAULT 'durable'",
         "ALTER TABLE facts ADD COLUMN query_hits INTEGER NOT NULL DEFAULT 0",
+    ],
+    7: [
+        # Security key rotation: generation counter on workspaces
+        "ALTER TABLE workspaces ADD COLUMN key_generation INTEGER NOT NULL DEFAULT 0",
     ],
 }
 
@@ -181,7 +185,8 @@ CREATE TABLE IF NOT EXISTS workspaces (
     engram_id        TEXT PRIMARY KEY,
     created_at       TEXT NOT NULL,
     anonymous_mode   INTEGER NOT NULL DEFAULT 0,
-    anon_agents      INTEGER NOT NULL DEFAULT 0
+    anon_agents      INTEGER NOT NULL DEFAULT 0,
+    key_generation   INTEGER NOT NULL DEFAULT 0
 );
 
 -- Invite keys (db_url is encrypted into the key token, NOT stored here)
@@ -324,7 +329,8 @@ CREATE TABLE IF NOT EXISTS workspaces (
     engram_id        TEXT PRIMARY KEY,
     created_at       TIMESTAMPTZ NOT NULL,
     anonymous_mode   BOOLEAN NOT NULL DEFAULT FALSE,
-    anon_agents      BOOLEAN NOT NULL DEFAULT FALSE
+    anon_agents      BOOLEAN NOT NULL DEFAULT FALSE,
+    key_generation   INTEGER NOT NULL DEFAULT 0
 );
 
 -- Invite keys (db_url encrypted into token, NOT stored here)

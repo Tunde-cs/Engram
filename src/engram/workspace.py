@@ -30,6 +30,8 @@ class WorkspaceConfig:
     schema: str = "engram"         # PostgreSQL schema name for Engram tables
     anonymous_mode: bool = False   # strip engineer field on every INSERT
     anon_agents: bool = False      # randomize agent_id each session
+    key_generation: int = 0        # must match DB key_generation; mismatch = disconnected
+    is_creator: bool = False       # True only for the agent who ran engram_init
 
 
 def read_workspace() -> WorkspaceConfig | None:
@@ -37,9 +39,13 @@ def read_workspace() -> WorkspaceConfig | None:
     if WORKSPACE_PATH.exists():
         try:
             data = json.loads(WORKSPACE_PATH.read_text())
-            # Backward compatibility: add schema if missing
+            # Backward compatibility: add fields if missing
             if "schema" not in data:
                 data["schema"] = "engram"
+            if "key_generation" not in data:
+                data["key_generation"] = 0
+            if "is_creator" not in data:
+                data["is_creator"] = False
             return WorkspaceConfig(**data)
         except Exception:
             return None
@@ -134,6 +140,7 @@ def generate_invite_key(
     expires_days: int = 90,
     uses_remaining: int | None = 10,
     schema: str = "engram",
+    key_generation: int = 0,
 ) -> tuple[str, str]:
     """Generate an invite key with db_url encrypted inside it.
 
@@ -151,6 +158,7 @@ def generate_invite_key(
         "expires_at": int(time.time()) + expires_days * 86400,
         "uses_remaining": uses_remaining,
         "created_at": int(time.time()),
+        "key_generation": key_generation,
     }).encode()
 
     ciphertext = _xor(payload, enc_key, iv)
@@ -209,9 +217,11 @@ def decode_invite_key(invite_key: str) -> dict[str, Any]:
     if payload.get("expires_at", 0) < int(time.time()):
         raise ValueError("This invite key has expired")
 
-    # Backward compatibility: add schema if missing (old keys)
+    # Backward compatibility: add fields if missing (old keys)
     if "schema" not in payload:
         payload["schema"] = "engram"
+    if "key_generation" not in payload:
+        payload["key_generation"] = 0
 
     return payload
 

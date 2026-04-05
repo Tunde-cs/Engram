@@ -760,6 +760,28 @@ class PostgresStorage(BaseStorage):
                 key_hash,
             )
 
+    async def get_key_generation(self, engram_id: str) -> int:
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT key_generation FROM workspaces WHERE engram_id = $1", engram_id
+            )
+        return row["key_generation"] if row else 0
+
+    async def bump_key_generation(self, engram_id: str) -> int:
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "UPDATE workspaces SET key_generation = key_generation + 1 "
+                "WHERE engram_id = $1 RETURNING key_generation",
+                engram_id,
+            )
+        return row["key_generation"] if row else 0
+
+    async def revoke_all_invite_keys(self, engram_id: str) -> None:
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM invite_keys WHERE engram_id = $1", engram_id
+            )
+
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
