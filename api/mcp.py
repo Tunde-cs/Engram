@@ -843,9 +843,15 @@ async def _handle_message(msg: dict, workspace_id: str | None) -> dict | None:
         if method == "tools/call":
             tool_name = params.get("name")
             args = params.get("arguments") or {}
+
+            # engram_status can respond without a DB connection when unauthenticated
+            if tool_name == "engram_status" and workspace_id is None:
+                result = await _tool_status(None, None)
+                content = [{"type": "text", "text": json.dumps(result, indent=2)}]
+                return _ok(msg_id, {"content": content})
+
             pool = await _get_pool()
 
-            # Tools that don't require auth
             if tool_name == "engram_status":
                 result = await _tool_status(workspace_id, pool)
             elif tool_name == "engram_init":

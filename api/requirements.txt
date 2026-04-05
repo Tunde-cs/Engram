@@ -1,1 +1,6 @@
 starlette
+asyncpg
+mcp
+pydantic
+uvicorn
+aiohttp
