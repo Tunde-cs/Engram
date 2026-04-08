@@ -936,7 +936,7 @@ async def _handle_message(msg: dict, workspace_id: str | None) -> dict | None:
                         workspace_id, pool,
                         content=args["content"],
                         scope=args.get("scope", "general"),
-                        confidence=float(args.get("confidence", 0.9)),
+                        confidence=float(args.get("confidence", 0.8)),
                         fact_type=args.get("fact_type", "observation"),
                         operation=args.get("operation", "add"),
                         durability=args.get("durability", "durable"),

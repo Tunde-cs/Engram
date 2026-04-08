@@ -76,8 +76,8 @@ class EngramEngine:
     async def commit(
         self,
         content: str,
-        scope: str,
-        confidence: float,
+        scope: str = "general",
+        confidence: float = 0.8,
         agent_id: str | None = None,
         engineer: str | None = None,
         corrects_lineage: str | None = None,

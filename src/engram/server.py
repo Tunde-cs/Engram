@@ -484,8 +484,8 @@ async def engram_reset_invite_key(
 )
 async def engram_commit(
     content: str,
-    scope: str,
-    confidence: float,
+    scope: str = "general",
+    confidence: float = 0.8,
     agent_id: str | None = None,
     engineer: str | None = None,
     corrects_lineage: str | None = None,
@@ -518,10 +518,12 @@ async def engram_commit(
       relevant. BAD: "auth is broken". GOOD: "The auth service
       rate-limits to 1000 req/s per IP using a sliding window in Redis,
       configured via AUTH_RATE_LIMIT in .env".
-    - scope: Hierarchical topic path. Examples: "auth", "payments/webhooks",
-      "infra/docker". Use consistent scopes across your team.
-    - confidence: 0.0-1.0. How certain is this claim? 1.0 = verified in
-      code. 0.7 = observed behavior. 0.3 = inferred from context.
+    - scope: Hierarchical topic path. Defaults to "general". Examples:
+      "auth", "payments/webhooks", "infra/docker". Use consistent scopes
+      across your team.
+    - confidence: 0.0-1.0. Defaults to 0.8. How certain is this claim?
+      1.0 = verified in code. 0.7 = observed behavior. 0.3 = inferred
+      from context.
     - agent_id: Your agent identifier. Use your agent name for attribution
       (e.g. the name field from your AgentConfig when using open-multi-agent).
       Auto-generated if omitted.
