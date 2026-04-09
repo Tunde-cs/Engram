@@ -522,22 +522,24 @@ class EngramEngine:
             is_ephemeral = fact.get("durability") == "ephemeral"
             if is_ephemeral:
                 ephemeral_ids.append(fact["id"])
-            results.append({
-                "fact_id": fact["id"],
-                "content": fact["content"],
-                "scope": fact["scope"],
-                "confidence": fact["confidence"],
-                "fact_type": fact["fact_type"],
-                "agent_id": fact["agent_id"],
-                "committed_at": fact["committed_at"],
-                "has_open_conflict": fact["id"] in open_conflict_ids,
-                "verified": fact.get("provenance") is not None,
-                "provenance": fact.get("provenance"),
-                "corroborating_agents": fact.get("corroborating_agents", 0),
-                "relevance_score": round(score, 4),
-                "durability": fact.get("durability", "durable"),
-                "adjacent": False,
-            })
+            results.append(
+                {
+                    "fact_id": fact["id"],
+                    "content": fact["content"],
+                    "scope": fact["scope"],
+                    "confidence": fact["confidence"],
+                    "fact_type": fact["fact_type"],
+                    "agent_id": fact["agent_id"],
+                    "committed_at": fact["committed_at"],
+                    "has_open_conflict": fact["id"] in open_conflict_ids,
+                    "verified": fact.get("provenance") is not None,
+                    "provenance": fact.get("provenance"),
+                    "corroborating_agents": fact.get("corroborating_agents", 0),
+                    "relevance_score": round(score, 4),
+                    "durability": fact.get("durability", "durable"),
+                    "adjacent": False,
+                }
+            )
             results.append(
                 {
                     "fact_id": fact["id"],
@@ -637,7 +639,10 @@ class EngramEngine:
         adjacent_facts: list[dict] = []
         for adj_scope in adjacent_scopes:
             facts = await self.storage.get_current_facts_in_scope(
-                scope=adj_scope, fact_type=fact_type, as_of=as_of, limit=50,
+                scope=adj_scope,
+                fact_type=fact_type,
+                as_of=as_of,
+                limit=50,
                 include_ephemeral=include_ephemeral,
             )
             adjacent_facts.extend(facts)
@@ -658,23 +663,25 @@ class EngramEngine:
 
             score = sim * score_penalty
 
-            results.append({
-                "fact_id": fact["id"],
-                "content": fact["content"],
-                "scope": fact["scope"],
-                "confidence": fact["confidence"],
-                "fact_type": fact["fact_type"],
-                "agent_id": fact["agent_id"],
-                "committed_at": fact["committed_at"],
-                "has_open_conflict": fact["id"] in open_conflict_ids,
-                "verified": fact.get("provenance") is not None,
-                "provenance": fact.get("provenance"),
-                "corroborating_agents": fact.get("corroborating_agents", 0),
-                "relevance_score": round(score, 4),
-                "durability": fact.get("durability", "durable"),
-                "adjacent": True,
-                "original_scope": fact["scope"],
-            })
+            results.append(
+                {
+                    "fact_id": fact["id"],
+                    "content": fact["content"],
+                    "scope": fact["scope"],
+                    "confidence": fact["confidence"],
+                    "fact_type": fact["fact_type"],
+                    "agent_id": fact["agent_id"],
+                    "committed_at": fact["committed_at"],
+                    "has_open_conflict": fact["id"] in open_conflict_ids,
+                    "verified": fact.get("provenance") is not None,
+                    "provenance": fact.get("provenance"),
+                    "corroborating_agents": fact.get("corroborating_agents", 0),
+                    "relevance_score": round(score, 4),
+                    "durability": fact.get("durability", "durable"),
+                    "adjacent": True,
+                    "original_scope": fact["scope"],
+                }
+            )
 
         results.sort(key=lambda r: r["relevance_score"], reverse=True)
         return results
