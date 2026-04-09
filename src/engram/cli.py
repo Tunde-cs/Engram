@@ -1153,6 +1153,151 @@ def reembed(model: str | None, batch_size: int, dry_run: bool) -> None:
     asyncio.run(run_reembed())
 
 
+# ── engram setup ───────────────────────────────────────────────────────
+
+
+@main.command()
+@click.option("--display-name", default=None, help="Display name for the workspace.")
+@click.option(
+    "--db-url", default=None, help="PostgreSQL connection URL (or set ENGRAM_DB_URL env var)."
+)
+@click.option("--schema", default="engram", help="PostgreSQL schema name (default: engram).")
+@click.option("--skip-mcp", is_flag=True, help="Skip MCP client configuration.")
+@click.option("--dry-run", is_flag=True, help="Show what would be done without making changes.")
+def setup(
+    display_name: str | None, db_url: str | None, schema: str, skip_mcp: bool, dry_run: bool
+) -> None:
+    """One-command setup: detect MCP clients, initialize workspace, print invite key and CLAUDE.md snippet.
+
+    This is the 5-minute install experience. Run this command and you'll have:
+    - MCP clients configured (unless --skip-mcp)
+    - Workspace initialized with a generated display name
+    - Invite key printed (share with teammates)
+    - CLAUDE.md snippet ready to copy-paste
+
+    Examples:
+        engram setup                                    # Interactive (prompts for DB URL if needed)
+        engram setup --db-url postgres://...           # Non-interactive with DB URL
+        engram setup --skip-mcp                        # Skip IDE configuration
+    """
+    import os
+
+    click.echo("\n=== Engram Setup ===")
+    click.echo("Starting one-command setup...\n")
+
+    # Step 1: Get database URL
+    if not db_url:
+        db_url = os.environ.get("ENGRAM_DB_URL", "")
+
+    if not db_url and not dry_run:
+        click.echo("❌ Database URL required.")
+        click.echo("  Set ENGRAM_DB_URL env var or pass --db-url")
+        click.echo("  Get a free database at: neon.tech, supabase.com, or railway.app")
+        return
+
+    # Step 2: Detect and configure MCP clients
+    if skip_mcp:
+        click.echo("[1/4] Skipping MCP configuration (--skip-mcp)")
+    else:
+        click.echo("[1/4] Detecting MCP clients...")
+        # Reuse the install logic to detect clients
+        added = []
+        for client_name, info in _MCP_CLIENTS.items():
+            config_path: Path = info["path"]
+            if config_path.exists():
+                added.append(client_name)
+
+        if added:
+            click.echo(f"  Found {len(added)} MCP clients: {', '.join(added[:5])}")
+            if not dry_run:
+                # Actually run install (this writes the config)
+                from click.testing import CliRunner
+                from engram.cli import install
+
+                runner = CliRunner()
+                result = runner.invoke(install, ["--dry-run" if dry_run else ""])
+                click.echo(f"  Would configure: {', '.join(added)}")
+        else:
+            click.echo("  No MCP clients detected")
+
+    # Step 3: Initialize workspace
+    click.echo("[2/4] Initializing workspace...")
+
+    if dry_run:
+        click.echo("  [DRY RUN] Would initialize workspace with:")
+        click.echo(f"    - Database: {db_url[:30]}..." if db_url else "    - Database: (not set)")
+        click.echo(f"    - Schema: {schema}")
+    else:
+        # Generate display name
+        if not display_name:
+            import socket
+
+            hostname = socket.gethostname().split(".")[0]
+            import time
+
+            display_name = f"{hostname}-{int(time.time())}"
+
+        # Set env for initialization
+        os.environ["ENGRAM_DB_URL"] = db_url
+
+        async def init_workspace():
+            # Import server to get engram_init
+            from engram.server import engram_init
+
+            # Call engram_init - this will initialize the workspace
+            result = await engram_init(
+                anonymous_mode=False,
+                anon_agents=False,
+                schema=schema,
+            )
+            return result
+
+        result = asyncio.run(init_workspace())
+
+        if result.get("status") == "initialized":
+            engram_id = result.get("engram_id", "unknown")
+            invite_key = result.get("invite_key", "unknown")
+            click.echo(f"  ✓ Workspace initialized: {engram_id}")
+            click.echo(f"  ✓ Invite key generated")
+        else:
+            click.echo(f"  ❌ Setup failed: {result.get('status')}")
+            return
+
+    # Step 4: Print invite key
+    click.echo("\n[3/4] Invite Key")
+    click.echo("-" * 40)
+    if dry_run:
+        click.echo("  ek_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+    else:
+        click.echo(f"  {result.get('invite_key')}")
+    click.echo("-" * 40)
+    click.echo("\nShare this with teammates!")
+
+    # Step 5: Print CLAUDE.md snippet
+    click.echo("\n[4/4] CLAUDE.md Snippet")
+    click.echo("-" * 40)
+    click.echo("Copy this to your project root as CLAUDE.md:")
+    click.echo("")
+
+    claude_snippet = f"""# CLAUDE.md - Project Context for Claude
+
+This project uses Engram for team memory. Before starting work on any task:
+
+1. Run `engram status` to check workspace connection
+2. Run `engram query "<your task>"` to check what the team already knows
+
+## Engram Workspace
+- Team ID: {engram_id if not dry_run else "YOUR_TEAM_ID"}
+- Schema: {schema}
+"""
+    click.echo(claude_snippet)
+    click.echo("-" * 40)
+
+    click.echo("\n✓ Setup complete!")
+    click.echo("\nNext steps:")
+    click.echo("  1. Restart your IDE")
+    click.echo("  2. Run: engram verify")
+    click.echo("  3. Start working with your team!\n")
 # ── engram completion ─────────────────────────────────────────────────
 
 _SHELL_CONFIGS = {

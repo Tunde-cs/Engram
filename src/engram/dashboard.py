@@ -31,6 +31,20 @@ def build_dashboard_routes(storage: Storage, engine: Any = None) -> list[Route]:
         return HTMLResponse(_render_landing())
 
     async def index(request: Request) -> HTMLResponse:
+        # Check workspace connection status
+        from engram.workspace import read_workspace
+
+        ws = read_workspace()
+        workspace_error = None
+        if ws is None:
+            workspace_error = "No workspace configured. Run 'engram setup' or 'engram init'."
+        elif ws.db_url:
+            # Try to verify connection by querying storage
+            try:
+                await storage.count_facts(current_only=False)
+            except Exception as e:
+                workspace_error = f"Workspace connection failed: {str(e)[:100]}"
+
         facts_count = await storage.count_facts(current_only=True)
         total_facts = await storage.count_facts(current_only=False)
         open_conflicts = await storage.count_conflicts("open")
@@ -45,6 +59,7 @@ def build_dashboard_routes(storage: Storage, engine: Any = None) -> list[Route]:
                 resolved_conflicts=resolved_conflicts,
                 agents=agents,
                 expiring_count=len(expiring),
+                workspace_error=workspace_error,
             )
         )
 
@@ -389,8 +404,23 @@ def _render_index(
     resolved_conflicts: int,
     agents: list[dict],
     expiring_count: int,
+    workspace_error: str | None = None,
 ) -> str:
+    # Show workspace error if present
+    error_html = ""
+    if workspace_error:
+        error_html = f"""
+        <div style="background:#fee2e2;border:1px solid #ef4444;padding:12px;margin-bottom:16px;border-radius:6px;">
+            <strong style="color:#dc2626;">⚠ Workspace Connection Error</strong>
+            <p style="color:#991b1b;margin:8px 0 0 0;">{workspace_error}</p>
+            <p style="color:#7f1d1d;margin:8px 0 0 0;font-size:13px;">
+                Run <code>engram verify</code> to diagnose or <code>engram setup</code> to reconfigure.
+            </p>
+        </div>
+        """
+
     body = f"""
+    {error_html}
     <div class="stats">
       <div class="stat stat-accent">
         <div class="stat-value">{facts_count}</div>
