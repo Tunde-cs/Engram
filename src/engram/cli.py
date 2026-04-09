@@ -652,11 +652,18 @@ async def _serve(
             logger.info("Dashboard: http://%s:%d/dashboard", host, port)
             from engram.dashboard import build_dashboard_routes
             from engram.federation import build_federation_routes
+            from engram.rest import build_rest_routes
             import uvicorn
             from starlette.routing import Mount
 
             dashboard_routes = build_dashboard_routes(storage)
             federation_routes = build_federation_routes(storage)
+            rest_routes = build_rest_routes(
+                engine=engine,
+                storage=storage,
+                auth_enabled=auth_enabled,
+                rate_limiter=server_module._rate_limiter,
+            )
             mcp_app = mcp.streamable_http_app()
 
             # Add routes to MCP app
@@ -664,6 +671,7 @@ async def _serve(
                 [
                     Mount("/dashboard", routes=dashboard_routes),
                     Mount("/api/federation", routes=federation_routes),
+                    *rest_routes,
                 ]
             )
 
@@ -845,7 +853,101 @@ def search(topic: str, scope: str | None, limit: int, as_json: bool) -> None:
 
     click.echo(output)
 
+# ── engram tail ──────────────────────────────────────────────────────
 
+
+def _format_tail_fact(fact: dict[str, object]) -> str:
+    """Format one fact for streaming terminal output."""
+    agent = fact.get("agent_id") or "unknown"
+    scope = fact.get("scope") or "-"
+    content = fact.get("content") or ""
+    confidence = fact.get("confidence")
+
+    if confidence is not None:
+        return f"[{agent}] [{scope}] {content} (confidence: {confidence:.2f})"
+
+    return f"[{agent}] [{scope}] {content}"
+
+
+async def _tail_once(
+    base_url: str,
+    after: str,
+    scope: str | None,
+    limit: int,
+) -> tuple[list[dict[str, object]], str]:
+    """Fetch facts newer than the watermark from the REST API."""
+    import urllib.parse
+    import urllib.request
+
+    params = {"after": after, "limit": str(limit)}
+    if scope:
+        params["scope"] = scope
+
+    url = f"{base_url.rstrip('/')}/api/tail?{urllib.parse.urlencode(params)}"
+
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+
+    facts = payload.get("facts", [])
+    latest_timestamp = payload.get("latest_timestamp", after)
+    return facts, latest_timestamp
+
+
+@main.command()
+@click.option("--scope", default=None, help="Optional scope prefix to filter streamed facts.")
+@click.option(
+    "--limit",
+    default=100,
+    type=click.IntRange(1, 1000),
+    show_default=True,
+    help="Maximum facts per poll.",
+)
+@click.option(
+    "--interval",
+    default=2.0,
+    type=float,
+    show_default=True,
+    help="Polling interval in seconds.",
+)
+@click.option(
+    "--url",
+    "base_url",
+    default="http://127.0.0.1:7474",
+    show_default=True,
+    help="Base URL for the Engram HTTP server.",
+)
+def tail(scope: str | None, limit: int, interval: float, base_url: str) -> None:
+    """Stream new workspace facts from the terminal."""
+    from datetime import datetime, timezone
+
+    click.echo("Starting tail stream. Press Ctrl+C to stop.")
+
+    after = datetime.now(timezone.utc).isoformat()
+
+    try:
+        while True:
+            facts, latest_timestamp = asyncio.run(
+                _tail_once(
+                    base_url=base_url,
+                    after=after,
+                    scope=scope,
+                    limit=limit,
+                )
+            )
+
+            for fact in facts:
+                click.echo(_format_tail_fact(fact))
+
+            after = latest_timestamp
+            import time
+
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        click.echo("\nStopped.")
+    except Exception as exc:
+        raise click.ClickException(str(exc))
+    
+    
 # ── engram verify ────────────────────────────────────────────────────
 
 

@@ -286,6 +286,41 @@ def build_rest_routes(
             return _error(str(exc), status=500)
 
         return JSONResponse(results)
+    
+    async def api_tail(request: Request) -> JSONResponse:
+        after = request.query_params.get("after")
+        if not after:
+            return _error("Missing 'after' parameter.")
+
+        scope = request.query_params.get("scope")
+
+        try:
+            limit = int(request.query_params.get("limit", "100"))
+        except (TypeError, ValueError):
+            limit = 100
+
+        limit = max(1, min(limit, 1000))
+
+        try:
+            facts = await storage.get_facts_since(after, scope_prefix=scope, limit=limit)
+        except Exception as exc:
+            logger.exception("REST /api/tail error")
+            return _error(str(exc), status=500)
+
+        clean = []
+        for fact in facts:
+            fact_copy = dict(fact)
+            fact_copy.pop("embedding", None)
+            clean.append(fact_copy)
+
+        latest_timestamp = clean[-1]["committed_at"] if clean else after
+        return JSONResponse(
+            {
+                "facts": clean,
+                "count": len(clean),
+                "latest_timestamp": latest_timestamp,
+            }
+        )
 
     async def api_conflicts(request: Request) -> JSONResponse:
         scope = request.query_params.get("scope")
@@ -561,6 +596,7 @@ def build_rest_routes(
     return [
         Route("/api/commit", api_commit, methods=["POST"]),
         Route("/api/query", api_query, methods=["POST"]),
+        Route("/api/tail", api_tail, methods=["GET"]),
         Route("/api/conflicts", api_conflicts, methods=["GET"]),
         Route("/api/resolve", api_resolve, methods=["POST"]),
         Route("/api/batch-commit", api_batch_commit, methods=["POST"]),
