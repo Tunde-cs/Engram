@@ -179,7 +179,7 @@ async def test_explicit_promotion_clears_ttl(engine: EngramEngine, storage: Stor
     after = await storage.get_fact_by_id(fact_id)
     assert after["durability"] == "durable"
     assert after["valid_until"] is None  # TTL cleared by promote
-    assert after["ttl_days"] is None     # TTL cleared by promote
+    assert after["ttl_days"] is None  # TTL cleared by promote
 
 
 @pytest.mark.asyncio

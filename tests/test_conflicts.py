@@ -151,7 +151,9 @@ async def test_winner_resolution_closes_losing_fact(engine: EngramEngine, storag
 
 
 @pytest.mark.asyncio
-async def test_dismissed_resolution_leaves_both_facts_active(engine: EngramEngine, storage: Storage):
+async def test_dismissed_resolution_leaves_both_facts_active(
+    engine: EngramEngine, storage: Storage
+):
     """Dismissing a conflict records a false-positive and leaves both facts active."""
     r1 = await engine.commit(
         content="Deployment target is us-east-1",
