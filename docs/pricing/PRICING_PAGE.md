@@ -31,7 +31,7 @@ This document provides the pricing page design for engram-us.com. Copy the HTML 
 - **Features:**
   - Everything in Free
   - Team memory sync
-  - Dashboard at dashboard.engram.us
+  - Dashboard at www.engram-us.com/dashboard
   - Real-time conflict notifications
   - Invite key-based team joining
   - Priority email support

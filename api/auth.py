@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS user_workspaces (
     role      TEXT NOT NULL DEFAULT 'owner',
     PRIMARY KEY (user_id, engram_id)
 );
+
+CREATE TABLE IF NOT EXISTS workspace_keys (
+    engram_id     TEXT PRIMARY KEY,
+    pin_salt      TEXT NOT NULL,
+    encrypted_key TEXT NOT NULL
+);
 """
 
 _pool: Any = None
@@ -381,6 +387,197 @@ async def handle_connect_workspace(request: Request) -> JSONResponse:
     return JSONResponse({"status": "connected", "engram_id": engram_id})
 
 
+# ── PIN-encrypted invite key helpers ─────────────────────────────────
+
+
+def _xor_stream(data: bytes, key: bytes) -> bytes:
+    stream = bytearray()
+    counter = 0
+    while len(stream) < len(data):
+        block = hashlib.sha256(key + counter.to_bytes(4, "big")).digest()
+        stream.extend(block)
+        counter += 1
+    ks = bytes(stream[: len(data)])
+    return bytes(a ^ b for a, b in zip(data, ks))
+
+
+def _encrypt_invite_key(invite_key: str, pin: str) -> tuple[str, str]:
+    """Encrypt invite key with a PIN. Returns (salt_hex, encrypted_hex)."""
+    salt = secrets.token_bytes(16)
+    derived = hashlib.pbkdf2_hmac("sha256", pin.encode(), salt, 260_000, dklen=32)
+    encrypted = _xor_stream(invite_key.encode(), derived)
+    return salt.hex(), encrypted.hex()
+
+
+def _decrypt_invite_key(pin: str, salt_hex: str, encrypted_hex: str) -> str:
+    """Decrypt invite key with a PIN."""
+    salt = bytes.fromhex(salt_hex)
+    encrypted = bytes.fromhex(encrypted_hex)
+    derived = hashlib.pbkdf2_hmac("sha256", pin.encode(), salt, 260_000, dklen=32)
+    return _xor_stream(encrypted, derived).decode()
+
+
+# ── Workspace init (mirrors mcp.py _tool_init) ───────────────────────
+
+
+def _xor_cipher(data: bytes, enc_key: bytes, iv: bytes) -> bytes:
+    stream = bytearray()
+    counter = 0
+    while len(stream) < len(data):
+        block = hashlib.sha256(enc_key + iv + counter.to_bytes(4, "big")).digest()
+        stream.extend(block)
+        counter += 1
+    ks = bytes(stream[: len(data)])
+    return bytes(a ^ b for a, b in zip(data, ks))
+
+
+def _generate_team_id() -> str:
+    import random
+    import string
+
+    chars = string.ascii_uppercase + string.digits
+    part = lambda n: "".join(random.choices(chars, k=n))  # noqa: E731
+    return f"ENG-{part(4)}-{part(4)}"
+
+
+def _generate_invite_key(engram_id: str, expires_days: int = 3650, uses: int = 1000) -> tuple[str, str]:
+    import json as _json
+    import time as _time
+
+    enc_key = secrets.token_bytes(32)
+    iv = secrets.token_bytes(16)
+    payload = _json.dumps(
+        {"engram_id": engram_id, "expires_at": int(_time.time()) + expires_days * 86400}
+    ).encode()
+    ciphertext = _xor_cipher(payload, enc_key, iv)
+    mac = hmac.new(enc_key, iv + ciphertext, hashlib.sha256).digest()
+    token = enc_key + iv + mac + ciphertext
+    b64 = base64.urlsafe_b64encode(token).rstrip(b"=").decode()
+    key_hash = hashlib.sha256(enc_key).hexdigest()
+    return f"ek_live_{b64}", key_hash
+
+
+# ── Handlers ──────────────────────────────────────────────────────────
+
+
+async def handle_create_workspace(request: Request) -> JSONResponse:
+    """Create a new Engram workspace and protect its invite key with a PIN."""
+    session = _get_jwt_from_request(request)
+    if not session:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    pin = str(body.get("pin") or "").strip()
+    if not pin.isdigit() or len(pin) != 4:
+        return JSONResponse({"error": "PIN must be exactly 4 digits"}, status_code=400)
+
+    try:
+        pool = await _get_pool()
+    except Exception as exc:
+        return JSONResponse({"error": f"Database error: {exc}"}, status_code=500)
+
+    import time as _time
+
+    engram_id = _generate_team_id()
+    invite_key, key_hash = _generate_invite_key(engram_id)
+    expires_ts = _time.time() + 3650 * 86400
+    pin_salt, encrypted_key = _encrypt_invite_key(invite_key, pin)
+
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO workspaces (engram_id) VALUES ($1)",
+                engram_id,
+            )
+            import datetime as _dt
+
+            expires_dt = _dt.datetime.fromtimestamp(expires_ts, tz=_dt.timezone.utc)
+            await conn.execute(
+                """INSERT INTO invite_keys (key_hash, engram_id, expires_at, uses_remaining)
+                   VALUES ($1, $2, $3, $4)""",
+                key_hash,
+                engram_id,
+                expires_dt,
+                1000,
+            )
+            await conn.execute(
+                """INSERT INTO workspace_keys (engram_id, pin_salt, encrypted_key)
+                   VALUES ($1, $2, $3)""",
+                engram_id,
+                pin_salt,
+                encrypted_key,
+            )
+            await conn.execute(
+                """INSERT INTO user_workspaces (user_id, engram_id, role)
+                   VALUES ($1, $2, 'owner')""",
+                session["sub"],
+                engram_id,
+            )
+    except Exception as exc:
+        return JSONResponse({"error": f"Failed to create workspace: {exc}"}, status_code=500)
+
+    return JSONResponse({"engram_id": engram_id, "invite_key": invite_key})
+
+
+async def handle_invite_key(request: Request) -> JSONResponse:
+    """Return the stored invite key after PIN verification."""
+    session = _get_jwt_from_request(request)
+    if not session:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    engram_id = (body.get("engram_id") or "").strip()
+    pin = str(body.get("pin") or "").strip()
+
+    if not engram_id or not pin:
+        return JSONResponse({"error": "engram_id and pin required"}, status_code=400)
+    if not pin.isdigit() or len(pin) != 4:
+        return JSONResponse({"error": "Invalid PIN"}, status_code=400)
+
+    try:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            owns = await conn.fetchrow(
+                "SELECT 1 FROM user_workspaces WHERE user_id = $1 AND engram_id = $2",
+                session["sub"],
+                engram_id,
+            )
+            if not owns:
+                return JSONResponse({"error": "Workspace not found or access denied"}, status_code=403)
+
+            row = await conn.fetchrow(
+                "SELECT pin_salt, encrypted_key FROM workspace_keys WHERE engram_id = $1",
+                engram_id,
+            )
+    except Exception as exc:
+        return JSONResponse({"error": f"Database error: {exc}"}, status_code=500)
+
+    if not row:
+        return JSONResponse(
+            {"error": "No invite key stored for this workspace. It may have been created outside the dashboard."},
+            status_code=404,
+        )
+
+    try:
+        invite_key = _decrypt_invite_key(pin, row["pin_salt"], row["encrypted_key"])
+    except Exception:
+        return JSONResponse({"error": "Incorrect PIN"}, status_code=401)
+
+    # Validate the decrypted key looks sane
+    if not invite_key.startswith("ek_live_"):
+        return JSONResponse({"error": "Incorrect PIN"}, status_code=401)
+
+    return JSONResponse({"invite_key": invite_key})
+
+
 async def handle_options(request: Request) -> Response:
     return Response(
         headers={
@@ -398,6 +595,8 @@ app = Starlette(
         Route("/auth/logout", handle_logout, methods=["POST"]),
         Route("/auth/me", handle_me, methods=["GET"]),
         Route("/auth/connect-workspace", handle_connect_workspace, methods=["POST"]),
+        Route("/auth/create-workspace", handle_create_workspace, methods=["POST"]),
+        Route("/auth/invite-key", handle_invite_key, methods=["POST"]),
         Route("/auth/{path:path}", handle_options, methods=["OPTIONS"]),
     ]
 )

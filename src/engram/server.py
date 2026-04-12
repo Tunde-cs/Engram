@@ -153,8 +153,10 @@ async def engram_status() -> dict[str, Any]:
             **tool_surface_metadata(),
             "next_prompt": (
                 "I detected a database connection string in your environment.\n\n"
-                "Do you have an Invite Key to join an existing workspace, "
-                "or are you setting up a new one?\n\n"
+                "What would you like to do?\n\n"
+                "- **Join an existing workspace** — paste your Invite Key (format: ek_live_...).\n"
+                "- **Create a new workspace** — say 'create' and I'll run `engram init` to set one up "
+                "and generate an invite key you can share with your team.\n\n"
                 "Note: Engram will create its tables in a separate 'engram' schema "
                 "in your database, so it won't interfere with your application tables."
             ),
@@ -166,13 +168,14 @@ async def engram_status() -> dict[str, Any]:
         "next_prompt": (
             "Welcome to Engram — shared memory for your team's agents.\n\n"
             "How would you like to get started?\n\n"
-            "1. **Engram Cloud** (Recommended) — Quickest setup. Get an invite key from your team admin, "
-            "or sign up at https://engram.us to create a workspace.\n"
+            "1. **Engram Cloud** (Recommended) — Quickest setup. Sign up at https://www.engram-us.com to create "
+            "a workspace and get an invite key, or paste an existing invite key to join your team.\n"
             "2. **PostgreSQL (Self-hosted)** — Use your own database. "
-            "You'll need a PostgreSQL connection URL ready.\n"
+            "You'll need a PostgreSQL connection URL ready. I'll run `engram init` to create the workspace.\n"
             "3. **SQLite (Local only)** — For solo use or quick experiments. "
-            "No team features available.\n\n"
-            "Type the number of your choice, or paste your Invite Key to join an existing workspace."
+            "No team features available. I'll run `engram init` to set it up.\n\n"
+            "Type the number of your choice, paste an Invite Key (ek_live_...) to join an existing workspace, "
+            "or say 'create' to set up a new one."
         ),
     }
 

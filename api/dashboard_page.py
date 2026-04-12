@@ -266,6 +266,43 @@ def _render_dashboard() -> str:
     .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
     .modal-actions button { flex: 1; }
 
+    /* PIN input */
+    .pin-row { display: flex; gap: 10px; justify-content: center; margin: 20px 0; }
+    .pin-digit {
+      width: 52px; height: 60px; border-radius: 12px; border: 1px solid rgba(52,211,153,0.15);
+      background: rgba(255,255,255,0.04); color: var(--t1); font-size: 26px; font-weight: 700;
+      text-align: center; font-family: 'JetBrains Mono', monospace;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .pin-digit:focus {
+      outline: none; border-color: var(--em5); box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
+    }
+
+    /* Invite key display */
+    .invite-key-box {
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      color: var(--em4); word-break: break-all; line-height: 1.6;
+      position: relative; margin: 16px 0;
+    }
+    .copy-btn {
+      margin-top: 8px; width: 100%; padding: 10px; border-radius: 9px;
+      background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.18);
+      color: var(--em4); font-size: 13px; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: background 0.2s;
+    }
+    .copy-btn:hover { background: rgba(52,211,153,0.15); }
+
+    /* Workspace list action buttons */
+    .ws-list-actions { display: flex; gap: 10px; }
+    .ws-card-footer { display: flex; justify-content: flex-end; margin-top: 14px; padding-top: 12px;
+      border-top: 1px solid var(--border); }
+    .ws-key-btn { padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600;
+      background: rgba(52,211,153,0.07); border: 1px solid rgba(52,211,153,0.15); color: var(--em4);
+      cursor: pointer; font-family: inherit; transition: background 0.2s; }
+    .ws-key-btn:hover { background: rgba(52,211,153,0.14); }
+
     /* ── WORKSPACE DETAIL ───────────────────────────────────────── */
     #ws-detail-screen { display: none; }
     .detail-header { padding: 24px 0 0; display: flex; align-items: center; gap: 16px;
@@ -593,12 +630,15 @@ def _render_dashboard() -> str:
   <div class="container">
     <div class="screen-header">
       <div class="screen-title">Your Workspaces</div>
-      <button class="btn-sm btn-primary" onclick="openConnectModal()">+ Connect Workspace</button>
+      <div class="ws-list-actions">
+        <button class="btn-sm btn-ghost" onclick="openConnectModal()">Connect existing</button>
+        <button class="btn-sm btn-primary" onclick="openCreateModal()">+ New workspace</button>
+      </div>
     </div>
     <div class="ws-grid" id="ws-grid">
       <div class="empty-state" style="grid-column:1/-1">
         No workspaces yet.<br>
-        <span style="font-size:13px">Create a workspace with <code style="font-family:JetBrains Mono,monospace;font-size:12px;background:rgba(52,211,153,0.08);padding:2px 6px;border-radius:4px">engram_init</code> in your IDE, then connect it here.</span>
+        <span style="font-size:13px">Click <strong>+ New workspace</strong> to create one, or connect an existing workspace with an invite key.</span>
       </div>
     </div>
   </div>
@@ -703,6 +743,76 @@ def _render_dashboard() -> str:
     <div class="modal-actions">
       <button class="btn-sm btn-ghost" onclick="closeConnectModal()">Cancel</button>
       <button class="btn-sm btn-primary" onclick="connectWorkspace()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CREATE WORKSPACE MODAL ───────────────────────────────────── -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <div id="create-step-pin">
+      <h3>Create a workspace</h3>
+      <p class="subtitle">Set a 4-digit PIN to protect your invite key. You'll need it to view the key again later.</p>
+      <div class="pin-row">
+        <input class="pin-digit" id="cp0" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="cp1" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="cp2" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="cp3" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      </div>
+      <p class="subtitle" style="margin-top:0;margin-bottom:8px">Confirm PIN</p>
+      <div class="pin-row">
+        <input class="pin-digit" id="cp4" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="cp5" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="cp6" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="cp7" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      </div>
+      <div class="auth-msg error" id="create-error"></div>
+      <div class="modal-actions">
+        <button class="btn-sm btn-ghost" onclick="closeCreateModal()">Cancel</button>
+        <button class="btn-sm btn-primary" id="create-btn" onclick="submitCreateWorkspace()">Create workspace</button>
+      </div>
+    </div>
+    <div id="create-step-done" style="display:none">
+      <h3>Workspace created</h3>
+      <p class="subtitle">Your invite key is shown below. Copy it now — you can always retrieve it again with your PIN.</p>
+      <div class="invite-key-box" id="create-invite-key-box"></div>
+      <button class="copy-btn" onclick="copyCreatedKey()">Copy invite key</button>
+      <p style="font-size:12px;color:var(--tm);margin-top:12px;line-height:1.6">
+        Add this key to your MCP config under <code style="background:rgba(52,211,153,0.08);padding:1px 5px;border-radius:4px">"Authorization": "Bearer &lt;key&gt;"</code> — or paste it when prompted by your IDE.
+      </p>
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn-sm btn-primary" onclick="closeCreateModal()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW INVITE KEY MODAL ────────────────────────────────────── -->
+<div class="modal-overlay" id="key-modal">
+  <div class="modal">
+    <div id="key-step-pin">
+      <h3>View invite key</h3>
+      <p class="subtitle" id="key-modal-subtitle">Enter your 4-digit PIN to reveal the invite key for <span id="key-modal-ws-id" style="color:var(--em4);font-family:'JetBrains Mono',monospace"></span>.</p>
+      <div class="pin-row">
+        <input class="pin-digit" id="kp0" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="kp1" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="kp2" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" id="kp3" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      </div>
+      <div class="auth-msg error" id="key-error"></div>
+      <div class="modal-actions">
+        <button class="btn-sm btn-ghost" onclick="closeKeyModal()">Cancel</button>
+        <button class="btn-sm btn-primary" id="key-btn" onclick="submitRevealKey()">Reveal</button>
+      </div>
+    </div>
+    <div id="key-step-done" style="display:none">
+      <h3>Invite key</h3>
+      <p class="subtitle">Share this key with teammates to give them access to the workspace.</p>
+      <div class="invite-key-box" id="reveal-invite-key-box"></div>
+      <button class="copy-btn" onclick="copyRevealedKey()">Copy invite key</button>
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn-sm btn-ghost" onclick="closeKeyModal()">Close</button>
+      </div>
     </div>
   </div>
 </div>
@@ -847,7 +957,7 @@ function renderWsGrid(workspaces) {
   if (!workspaces.length) {
     el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
       No workspaces yet.<br>
-      <span style="font-size:13px">Create a workspace with <code style="font-family:JetBrains Mono,monospace;font-size:12px;background:rgba(52,211,153,0.08);padding:2px 6px;border-radius:4px">engram_init</code> in your IDE, then connect it here.</span>
+      <span style="font-size:13px">Click <strong>+ New workspace</strong> to create one, or connect an existing workspace with an invite key.</span>
     </div>`;
     return;
   }
@@ -857,14 +967,20 @@ function renderWsGrid(workspaces) {
     const fillClass = pct >= 100 ? 'over' : pct >= 80 ? 'near' : '';
     const isPaused = ws.paused;
     const plan = ws.plan || 'hobby';
-    return `<div class="ws-card ${isPaused ? 'paused' : ''}" onclick="openWorkspace('${esc(ws.engram_id)}')">
-      <div class="ws-id">${esc(ws.engram_id)}</div>
-      <div class="ws-badges">
-        <span class="badge ${isPaused ? 'badge-paused' : 'badge-active'}">${isPaused ? 'Paused' : 'Active'}</span>
-        <span class="badge ${plan === 'pro' ? 'badge-pro' : 'badge-hobby'}">${plan}</span>
+    const wsId = esc(ws.engram_id);
+    return `<div class="ws-card ${isPaused ? 'paused' : ''}">
+      <div onclick="openWorkspace('${wsId}')" style="cursor:pointer">
+        <div class="ws-id">${wsId}</div>
+        <div class="ws-badges">
+          <span class="badge ${isPaused ? 'badge-paused' : 'badge-active'}">${isPaused ? 'Paused' : 'Active'}</span>
+          <span class="badge ${plan === 'pro' ? 'badge-pro' : 'badge-hobby'}">${plan}</span>
+        </div>
+        <div class="ws-usage-bar"><div class="ws-usage-fill ${fillClass}" style="width:${pct}%"></div></div>
+        <div class="ws-usage-label">${storageMib} MiB / 512 MiB free</div>
       </div>
-      <div class="ws-usage-bar"><div class="ws-usage-fill ${fillClass}" style="width:${pct}%"></div></div>
-      <div class="ws-usage-label">${storageMib} MiB / 512 MiB free</div>
+      <div class="ws-card-footer">
+        <button class="ws-key-btn" onclick="event.stopPropagation();openKeyModal('${wsId}')">View invite key</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -901,6 +1017,137 @@ async function connectWorkspace() {
     errEl.textContent = 'Connection error';
     errEl.style.display = 'block';
   }
+}
+
+// ── PIN digit helpers ───────────────────────────────────────────────
+function wirePinDigits(ids) {
+  ids.forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      el.value = el.value.replace(/\D/g, '').slice(0, 1);
+      if (el.value && i < ids.length - 1) document.getElementById(ids[i + 1]).focus();
+    });
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !el.value && i > 0) document.getElementById(ids[i - 1]).focus();
+    });
+  });
+}
+function getPinValue(ids) {
+  return ids.map(id => document.getElementById(id).value).join('');
+}
+function clearPinDigits(ids) {
+  ids.map(id => document.getElementById(id)).forEach(el => { el.value = ''; });
+}
+
+// ── Create workspace modal ──────────────────────────────────────────
+const CREATE_PIN_IDS = ['cp0','cp1','cp2','cp3'];
+const CREATE_CONFIRM_IDS = ['cp4','cp5','cp6','cp7'];
+let _createdInviteKey = null;
+
+function openCreateModal() {
+  clearPinDigits([...CREATE_PIN_IDS, ...CREATE_CONFIRM_IDS]);
+  document.getElementById('create-error').style.display = 'none';
+  document.getElementById('create-step-pin').style.display = 'block';
+  document.getElementById('create-step-done').style.display = 'none';
+  document.getElementById('create-modal').classList.add('open');
+  wirePinDigits(CREATE_PIN_IDS);
+  wirePinDigits(CREATE_CONFIRM_IDS);
+  setTimeout(() => document.getElementById('cp0').focus(), 50);
+}
+function closeCreateModal() {
+  document.getElementById('create-modal').classList.remove('open');
+  _createdInviteKey = null;
+  clearPinDigits([...CREATE_PIN_IDS, ...CREATE_CONFIRM_IDS]);
+}
+async function submitCreateWorkspace() {
+  const pin = getPinValue(CREATE_PIN_IDS);
+  const confirm = getPinValue(CREATE_CONFIRM_IDS);
+  const errEl = document.getElementById('create-error');
+  errEl.style.display = 'none';
+  if (pin.length !== 4) { errEl.textContent = 'Enter all 4 PIN digits'; errEl.style.display = 'block'; return; }
+  if (pin !== confirm) { errEl.textContent = 'PINs do not match'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('create-btn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  try {
+    const r = await fetch('/auth/create-workspace', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ pin }),
+    });
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.error || 'Failed to create workspace'; errEl.style.display = 'block'; return; }
+    _createdInviteKey = d.invite_key;
+    document.getElementById('create-invite-key-box').textContent = d.invite_key;
+    document.getElementById('create-step-pin').style.display = 'none';
+    document.getElementById('create-step-done').style.display = 'block';
+    // Refresh workspace list
+    const meR = await fetch('/auth/me', { credentials: 'include' });
+    SESSION = await meR.json();
+    showWsListScreen(SESSION.workspaces);
+  } catch(e) {
+    errEl.textContent = 'Connection error'; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create workspace';
+  }
+}
+function copyCreatedKey() {
+  if (_createdInviteKey) navigator.clipboard.writeText(_createdInviteKey);
+}
+
+// ── View invite key modal ───────────────────────────────────────────
+const KEY_PIN_IDS = ['kp0','kp1','kp2','kp3'];
+let _keyModalWsId = null;
+let _revealedKey = null;
+
+function openKeyModal(engram_id) {
+  _keyModalWsId = engram_id;
+  _revealedKey = null;
+  clearPinDigits(KEY_PIN_IDS);
+  document.getElementById('key-error').style.display = 'none';
+  document.getElementById('key-modal-ws-id').textContent = engram_id;
+  document.getElementById('key-step-pin').style.display = 'block';
+  document.getElementById('key-step-done').style.display = 'none';
+  document.getElementById('key-modal').classList.add('open');
+  wirePinDigits(KEY_PIN_IDS);
+  setTimeout(() => document.getElementById('kp0').focus(), 50);
+}
+function closeKeyModal() {
+  document.getElementById('key-modal').classList.remove('open');
+  _keyModalWsId = null;
+  _revealedKey = null;
+  clearPinDigits(KEY_PIN_IDS);
+}
+async function submitRevealKey() {
+  const pin = getPinValue(KEY_PIN_IDS);
+  const errEl = document.getElementById('key-error');
+  errEl.style.display = 'none';
+  if (pin.length !== 4) { errEl.textContent = 'Enter all 4 PIN digits'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('key-btn');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const r = await fetch('/auth/invite-key', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ engram_id: _keyModalWsId, pin }),
+    });
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.error || 'Incorrect PIN'; errEl.style.display = 'block'; return; }
+    _revealedKey = d.invite_key;
+    document.getElementById('reveal-invite-key-box').textContent = d.invite_key;
+    document.getElementById('key-step-pin').style.display = 'none';
+    document.getElementById('key-step-done').style.display = 'block';
+  } catch(e) {
+    errEl.textContent = 'Connection error'; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Reveal';
+  }
+}
+function copyRevealedKey() {
+  if (_revealedKey) navigator.clipboard.writeText(_revealedKey);
 }
 
 // ── Open workspace detail ───────────────────────────────────────────
@@ -1346,6 +1593,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('connect-modal').addEventListener('click', e => {
     if (e.target === document.getElementById('connect-modal')) closeConnectModal();
+  });
+  document.getElementById('create-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('create-modal')) closeCreateModal();
+  });
+  document.getElementById('key-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('key-modal')) closeKeyModal();
   });
   boot();
 });
