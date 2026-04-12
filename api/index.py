@@ -617,15 +617,15 @@ def _render_landing() -> str:
             <button class="tab" onclick="switchTab('cmd')">CMD</button>
           </div>
           <div class="code-block" id="tab-mac">
-            <button class="copy-btn" onclick="copyCode('install-mac')">Copy</button>
+            <button class="copy-btn" onclick="copyCode('install-mac', event)">Copy</button>
             <div id="install-mac">curl -fsSL https://engram-us.com/install | sh</div>
           </div>
           <div class="code-block" id="tab-ps" style="display:none;">
-            <button class="copy-btn" onclick="copyCode('install-ps')">Copy</button>
+            <button class="copy-btn" onclick="copyCode('install-ps', event)">Copy</button>
             <div id="install-ps">irm https://engram-us.com/install.ps1 | iex</div>
           </div>
           <div class="code-block" id="tab-cmd" style="display:none;">
-            <button class="copy-btn" onclick="copyCode('install-cmd')">Copy</button>
+            <button class="copy-btn" onclick="copyCode('install-cmd', event)">Copy</button>
             <div id="install-cmd">curl -fsSL https://engram-us.com/install.cmd -o install.cmd &amp;&amp; install.cmd &amp;&amp; del install.cmd</div>
           </div>
         </div>
@@ -641,7 +641,7 @@ def _render_landing() -> str:
         <div class="step-content">
           <div class="step-title">Ask your agent</div>
           <div class="code-block">
-            <button class="copy-btn" onclick="copyCode('setup-prompt')">Copy</button>
+            <button class="copy-btn" onclick="copyCode('setup-prompt', event)">Copy</button>
             <div id="setup-prompt">"Set up Engram for my team"</div>
           </div>
         </div>
@@ -818,10 +818,10 @@ function switchTab(platform) {
 
 // ── Copy helper ────────────────────────────────────────────────────
 let toastTimeout;
-function copyCode(id) {
+function copyCode(id, evt) {
+  const btn = (evt && evt.currentTarget) || document.querySelector('#' + id).closest('.code-block').querySelector('.copy-btn');
   const text = document.getElementById(id).textContent.trim();
   navigator.clipboard.writeText(text).then(() => {
-    const btn = event.target;
     const original = btn.textContent;
     btn.textContent = '✓ Copied';
     btn.classList.add('copied');
@@ -837,6 +837,20 @@ function copyCode(id) {
       block.style.boxShadow = '0 0 20px rgba(52, 211, 153, 0.1)';
       setTimeout(() => { block.style.borderColor = ''; block.style.boxShadow = ''; }, 800);
     }
+  }).catch(() => {
+    // Fallback for browsers that block clipboard API (e.g. non-HTTPS)
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    const original = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 2000);
+    const toast = document.getElementById('copy-toast');
+    clearTimeout(toastTimeout);
+    toast.classList.add('show');
+    toastTimeout = setTimeout(() => toast.classList.remove('show'), 2500);
   });
 }
 
