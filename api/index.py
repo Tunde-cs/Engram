@@ -85,6 +85,11 @@ def _render_landing() -> str:
       text-decoration: none; letter-spacing: -0.03em;
       display: flex; align-items: center; gap: 10px;
     }
+    .logo-memory {
+      font-size: 13px; font-weight: 400; color: rgba(52, 211, 153, 0.5);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      align-self: flex-end; margin-bottom: 2px; margin-left: 2px;
+    }
     .logo-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--emerald-400);
@@ -429,7 +434,8 @@ def _render_landing() -> str:
       border-top: 1px solid var(--border-subtle);
     }
     .footer-links { display: flex; gap: 28px; justify-content: center; align-items: center; margin-bottom: 16px; }
-    .footer-logo { font-size: 18px; font-weight: 700; color: var(--emerald-400); letter-spacing: -0.02em; }
+    .footer-logo { font-size: 18px; font-weight: 700; color: var(--emerald-400); letter-spacing: -0.02em; display: inline-flex; align-items: baseline; gap: 6px; }
+    .footer-logo-memory { font-size: 10px; font-weight: 400; color: rgba(52, 211, 153, 0.45); letter-spacing: 0.12em; text-transform: uppercase; }
     .footer-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; transition: color 0.25s; }
     .footer-links a:hover { color: var(--emerald-400); }
     .footer-tagline { font-size: 13px; color: var(--text-muted); font-style: italic; }
@@ -561,7 +567,7 @@ def _render_landing() -> str:
 <header>
   <div class="container">
     <div class="header-content">
-      <a href="/" class="logo"><span class="logo-dot"></span>engram</a>
+      <a href="/" class="logo"><span class="logo-dot"></span>engram<span class="logo-memory">memory</span></a>
       <nav class="nav-links">
         <a href="#install">Install</a>
         <a href="/dashboard">Dashboard</a>
@@ -705,7 +711,7 @@ def _render_landing() -> str:
 <footer>
   <div class="container">
     <div class="footer-links">
-      <span class="footer-logo">engram</span>
+      <span class="footer-logo">engram<span class="footer-logo-memory">memory</span></span>
       <a href="https://github.com/Agentscreator/Engram" target="_blank">GitHub</a>
       <a href="https://github.com/Agentscreator/Engram/blob/main/LICENSE" target="_blank">Apache 2.0</a>
       <a href="https://discord.gg/2SQ34TfA" target="_blank">Discord</a>
