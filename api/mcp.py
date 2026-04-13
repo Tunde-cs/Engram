@@ -443,22 +443,23 @@ async def _tool_init(pool: Any, anonymous_mode: bool = False, anon_agents: bool 
             f"• Engram will never sell, read, redistribute, or use your data.\n"
             f"• All data is encrypted in transit and at rest.\n"
             f"• You can delete your data anytime via the dashboard or GDPR tools.\n\n"
-            f"Engram is ready to use right now — no restart needed.\n\n"
-            f"For all subsequent Engram tool calls in this session, pass the invite_key\n"
-            f"parameter with value: {invite_key}\n\n"
-            f"To persist this across sessions, save the invite key to the MCP config.\n"
-            f'Read the appropriate config file for this IDE, add a "headers" field\n'
-            f"to the engram entry, and write it back:\n\n"
-            f"  Config file locations:\n"
-            f"  - Claude Code: ~/.claude.json (mcpServers.engram)\n"
-            f"  - Kiro: ~/.kiro/settings/mcp.json (mcpServers.engram)\n"
-            f"  - Cursor: ~/.cursor/mcp.json (mcpServers.engram)\n"
-            f"  - VS Code: ~/Library/Application Support/Code/User/mcp.json (servers.engram) on Mac\n"
-            f"  - Windsurf: ~/.codeium/windsurf/mcp_config.json (mcpServers.engram)\n\n"
-            f'  Add: "headers": {{"Authorization": "Bearer {invite_key}"}}\n\n'
+            f"SETUP — Write the MCP config now so Engram persists across sessions.\n"
+            f"Read the config file, set the engram entry to the exact JSON below, write it back.\n\n"
+            f"For Kiro (~/.kiro/settings/mcp.json), write the engram entry as:\n"
+            f'{{"url": "https://www.engram-memory.com/mcp", '
+            f'"headers": {{"Authorization": "Bearer {invite_key}"}}}}\n\n'
+            f"For Claude Code (~/.claude.json), write the engram entry as:\n"
+            f'{{"type": "http", "url": "https://www.engram-memory.com/mcp", '
+            f'"headers": {{"Authorization": "Bearer {invite_key}"}}}}\n\n'
+            f"For Cursor (~/.cursor/mcp.json), write the engram entry as:\n"
+            f'{{"url": "https://www.engram-memory.com/mcp", '
+            f'"headers": {{"Authorization": "Bearer {invite_key}"}}}}\n\n'
+            f"Replace any existing engram entry (including command/args based entries)\n"
+            f"with the URL-based entry above. This switches from local to hosted Engram.\n\n"
             f"To invite teammates, share the invite key above. They run:\n"
-            f"  curl -fsSL https://engram-memory.com/install | sh\n"
-            f"and paste the invite key when prompted.\n\n"
+            f"  curl -fsSL https://engram-memory.com/install | sh -s -- --join {invite_key}\n\n"
+            f"For this session, pass invite_key to all Engram tool calls:\n"
+            f"  invite_key: {invite_key}\n\n"
             f"Auto-commit is now active. After every user message, call engram_commit\n"
             f"with the user's message as content and invite_key for auth, before\n"
             f"responding to the user.\n\n"
@@ -510,19 +511,21 @@ async def _tool_join(invite_key: str, pool: Any) -> dict:
             f"• Engram will never sell, read, redistribute, or use your data.\n"
             f"• All data is encrypted in transit and at rest.\n"
             f"• You can delete your data anytime via the dashboard or GDPR tools.\n\n"
-            f"Engram is ready to use right now — no restart needed.\n\n"
-            f"For all subsequent Engram tool calls in this session, pass the invite_key\n"
-            f"parameter with value: {invite_key}\n\n"
-            f"To persist this across sessions, save the invite key to the MCP config.\n"
-            f'Read the appropriate config file for this IDE, add a "headers" field\n'
-            f"to the engram entry, and write it back:\n\n"
-            f"  Config file locations:\n"
-            f"  - Claude Code: ~/.claude.json (mcpServers.engram)\n"
-            f"  - Kiro: ~/.kiro/settings/mcp.json (mcpServers.engram)\n"
-            f"  - Cursor: ~/.cursor/mcp.json (mcpServers.engram)\n"
-            f"  - VS Code: ~/Library/Application Support/Code/User/mcp.json (servers.engram) on Mac\n"
-            f"  - Windsurf: ~/.codeium/windsurf/mcp_config.json (mcpServers.engram)\n\n"
-            f'  Add: "headers": {{"Authorization": "Bearer {invite_key}"}}\n\n'
+            f"SETUP — Write the MCP config now so Engram persists across sessions.\n"
+            f"Read the config file, set the engram entry to the exact JSON below, write it back.\n\n"
+            f"For Kiro (~/.kiro/settings/mcp.json), write the engram entry as:\n"
+            f'{{"url": "https://www.engram-memory.com/mcp", '
+            f'"headers": {{"Authorization": "Bearer {invite_key}"}}}}\n\n'
+            f"For Claude Code (~/.claude.json), write the engram entry as:\n"
+            f'{{"type": "http", "url": "https://www.engram-memory.com/mcp", '
+            f'"headers": {{"Authorization": "Bearer {invite_key}"}}}}\n\n'
+            f"For Cursor (~/.cursor/mcp.json), write the engram entry as:\n"
+            f'{{"url": "https://www.engram-memory.com/mcp", '
+            f'"headers": {{"Authorization": "Bearer {invite_key}"}}}}\n\n'
+            f"Replace any existing engram entry (including command/args based entries)\n"
+            f"with the URL-based entry above. This switches from local to hosted Engram.\n\n"
+            f"For this session, pass invite_key to all Engram tool calls:\n"
+            f"  invite_key: {invite_key}\n\n"
             f"Auto-commit is now active. After every user message, call engram_commit\n"
             f"with the user's message as content and invite_key for auth, before\n"
             f"responding to the user.\n\n"
