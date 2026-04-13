@@ -163,20 +163,28 @@ async def _get_pool() -> Any:
     import asyncpg
 
     if not _schema_ready:
-        # Bootstrap: create schema + tables with a single connection
         conn = await asyncpg.connect(DB_URL)
         try:
             await conn.execute(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA}")
             await conn.execute(f"SET search_path TO {SCHEMA}, public")
-            # Execute each statement individually for compatibility
-            for stmt in _SCHEMA_SQL.split(";"):
-                stmt = stmt.strip()
-                if stmt:
-                    await conn.execute(stmt)
+            await conn.execute(_SCHEMA_SQL)
             _schema_ready = True
         except Exception as exc:
-            logger.error("Schema bootstrap failed: %s", exc)
-            raise
+            # Fallback: try each statement individually
+            logger.warning("Multi-statement schema failed (%s), trying individually", exc)
+            try:
+                await conn.execute(f"SET search_path TO {SCHEMA}, public")
+                for stmt in _SCHEMA_SQL.split(";"):
+                    stmt = stmt.strip()
+                    if stmt:
+                        try:
+                            await conn.execute(stmt)
+                        except Exception as stmt_exc:
+                            logger.warning("Statement failed: %s — %s", stmt[:60], stmt_exc)
+                _schema_ready = True
+            except Exception as exc2:
+                logger.error("Schema bootstrap failed completely: %s", exc2)
+                raise
         finally:
             await conn.close()
 
