@@ -5,7 +5,7 @@
 
 set -e
 
-MCP_URL="${ENGRAM_MCP_URL:-https://mcp.engram.app/mcp}"
+MCP_URL="${ENGRAM_MCP_URL:-https://www.engram-memory.com/mcp}"
 INVITE_KEY=""
 
 # Parse --join flag
@@ -224,18 +224,18 @@ Guide the user through configuring the Engram MCP server in their IDE.
 
 The ONLY correct Engram MCP endpoint is:
 
-    https://mcp.engram.app/mcp
+    https://www.engram-memory.com/mcp
 
-DO NOT use engram-memory.com — that is the marketing website, NOT the MCP server.
-DO NOT guess or infer the MCP URL from any other domain. Always use exactly:
+DO NOT invent subdomains like mcp.engram-memory.com or mcp.engram.app — they do not exist.
+DO NOT omit the www prefix. Always use exactly:
 
-    https://mcp.engram.app/mcp
+    https://www.engram-memory.com/mcp
 
 ## Step 1 — Check existing config and auto-fix wrong URLs
 
 Read ~/.claude.json and .mcp.json (if they exist). If either contains an "engram"
-entry under mcpServers with a WRONG url (anything other than https://mcp.engram.app/mcp,
-e.g. engram-memory.com), fix it to https://mcp.engram.app/mcp and tell the user you
+entry under mcpServers with a WRONG url (anything other than https://www.engram-memory.com/mcp,
+e.g. mcp.engram.app or mcp.engram-memory.com), fix it to https://www.engram-memory.com/mcp and tell the user you
 corrected it.
 
 If Engram is already correctly configured, tell the user and skip to Step 4.
@@ -245,7 +245,7 @@ If Engram is already correctly configured, tell the user and skip to Step 4.
 **Question 1 — header: "Engram type"**
 question: "What Engram implementation do you want to use?"
 options:
-1. label: "Engram hosted server (Recommended)" — description: "Use the managed Engram MCP server at mcp.engram.app — no installation needed, easiest to get started"
+1. label: "Engram hosted server (Recommended)" — description: "Use the managed Engram MCP server at engram-memory.com — no installation needed, easiest to get started"
 2. label: "Self-hosted / custom" — description: "You have your own Engram server URL or a local binary you want to connect to"
 3. label: "Walk me through the options and tradeoffs" — description: "Explain the differences before I decide"
 4. label: "Chat about this" — description: "I have a question first"
@@ -261,7 +261,7 @@ If the user picks "Walk me through the options" or "Chat about this" on either q
 
 ## Step 3 — Write config
 
-IMPORTANT: The url MUST be exactly https://mcp.engram.app/mcp — no other domain.
+IMPORTANT: The url MUST be exactly https://www.engram-memory.com/mcp — no other domain.
 
 ### Hosted + User-level (~/.claude.json)
 
@@ -271,7 +271,7 @@ Read ~/.claude.json if it exists, then merge:
   "mcpServers": {
     "engram": {
       "type": "http",
-      "url": "https://mcp.engram.app/mcp"
+      "url": "https://www.engram-memory.com/mcp"
     }
   }
 }
@@ -286,7 +286,7 @@ Read .mcp.json in the project root if it exists, then merge:
   "mcpServers": {
     "engram": {
       "type": "http",
-      "url": "https://mcp.engram.app/mcp"
+      "url": "https://www.engram-memory.com/mcp"
     }
   }
 }
@@ -316,7 +316,7 @@ Same as above but write to .mcp.json.
 
 Tell the user:
 1. Which file was written and what was added
-2. The MCP URL is https://mcp.engram.app/mcp (NOT engram-memory.com)
+2. The MCP URL is https://www.engram-memory.com/mcp
 3. To restart Claude Code (or run /mcp) for the change to take effect
 4. Once restarted: the Engram MCP tools will be available. Call engram_status() — it will guide them through engram_init (create a new team workspace) or engram_join (join a teammate's workspace with an invite key)
 SKILLEOF

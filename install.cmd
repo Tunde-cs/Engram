@@ -7,7 +7,7 @@ setlocal enabledelayedexpansion
 if defined ENGRAM_MCP_URL (
     set "MCP_URL=%ENGRAM_MCP_URL%"
 ) else (
-    set "MCP_URL=https://mcp.engram.app/mcp"
+    set "MCP_URL=https://www.engram-memory.com/mcp"
 )
 set "INVITE_KEY="
 
@@ -165,18 +165,18 @@ echo ## CRITICAL -- Correct MCP URL
 echo.
 echo The ONLY correct Engram MCP endpoint is:
 echo.
-echo     https://mcp.engram.app/mcp
+echo     https://www.engram-memory.com/mcp
 echo.
-echo DO NOT use engram-memory.com -- that is the marketing website, NOT the MCP server.
-echo DO NOT guess or infer the MCP URL from any other domain. Always use exactly:
+echo DO NOT invent subdomains like mcp.engram-memory.com or mcp.engram.app -- they do not exist.
+echo DO NOT omit the www prefix. Always use exactly:
 echo.
-echo     https://mcp.engram.app/mcp
+echo     https://www.engram-memory.com/mcp
 echo.
 echo ## Step 1 -- Check existing config and auto-fix wrong URLs
 echo.
 echo Read ~/.claude.json and .mcp.json ^(if they exist^). If either contains an "engram"
-echo entry under mcpServers with a WRONG url ^(anything other than https://mcp.engram.app/mcp,
-echo e.g. engram-memory.com^), fix it to https://mcp.engram.app/mcp and tell the user you
+echo entry under mcpServers with a WRONG url ^(anything other than https://www.engram-memory.com/mcp,
+echo e.g. mcp.engram.app or mcp.engram-memory.com^), fix it to https://www.engram-memory.com/mcp and tell the user you
 echo corrected it.
 echo.
 echo If Engram is already correctly configured, tell the user and skip to Step 4.
@@ -186,7 +186,7 @@ echo.
 echo **Question 1 -- header: "Engram type"**
 echo question: "What Engram implementation do you want to use?"
 echo options:
-echo 1. label: "Engram hosted server ^(Recommended^)" -- description: "Use the managed Engram MCP server at mcp.engram.app -- no installation needed, easiest to get started"
+echo 1. label: "Engram hosted server ^(Recommended^)" -- description: "Use the managed Engram MCP server at engram-memory.com -- no installation needed, easiest to get started"
 echo 2. label: "Self-hosted / custom" -- description: "You have your own Engram server URL or a local binary you want to connect to"
 echo 3. label: "Walk me through the options and tradeoffs" -- description: "Explain the differences before I decide"
 echo 4. label: "Chat about this" -- description: "I have a question first"
@@ -202,15 +202,15 @@ echo If the user picks "Walk me through the options" or "Chat about this", answe
 echo.
 echo ## Step 3 -- Write config
 echo.
-echo IMPORTANT: The url MUST be exactly https://mcp.engram.app/mcp -- no other domain.
+echo IMPORTANT: The url MUST be exactly https://www.engram-memory.com/mcp -- no other domain.
 echo.
-echo Hosted + User-level: merge into ~/.claude.json with mcpServers.engram = {type: "http", url: "https://mcp.engram.app/mcp"}
+echo Hosted + User-level: merge into ~/.claude.json with mcpServers.engram = {type: "http", url: "https://www.engram-memory.com/mcp"}
 echo Hosted + Project-level: merge into .mcp.json with same entry
 echo Self-hosted: ask for URL first, then write accordingly
 echo.
 echo ## Step 4 -- Next steps
 echo.
-echo Tell the user which file was written, that the MCP URL is https://mcp.engram.app/mcp ^(NOT engram-memory.com^), to restart Claude Code, then call engram_status^(^) to run engram_init or engram_join.
+echo Tell the user which file was written, that the MCP URL is https://www.engram-memory.com/mcp, to restart Claude Code, then call engram_status^(^) to run engram_init or engram_join.
 ) > "%SKILL_FILE%"
 echo   + %SKILL_FILE%
 

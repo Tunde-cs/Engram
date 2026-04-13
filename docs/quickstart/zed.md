@@ -18,7 +18,7 @@ Edit `~/.config/zed/settings.json` and add:
 {
   "context_servers": {
     "engram": {
-      "url": "https://mcp.engram.app/mcp"
+      "url": "https://www.engram-memory.com/mcp"
     }
   }
 }

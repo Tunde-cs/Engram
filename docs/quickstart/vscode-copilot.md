@@ -22,7 +22,7 @@ curl -fsSL https://engram-memory.com/install | sh
   "servers": {
     "engram": {
       "type": "http",
-      "url": "https://mcp.engram.app/mcp"
+      "url": "https://www.engram-memory.com/mcp"
     }
   }
 }
@@ -78,7 +78,7 @@ Expected output:
 
 - VS Code expects MCP servers under the top-level `servers` key, not `mcpServers`.
 - Remote Engram uses `"type": "http"` with the `/mcp` URL.
-- Opening `https://mcp.engram.app/mcp` in a browser is not a reliable test; verify from
+- Opening `https://www.engram-memory.com/mcp` in a browser is not a reliable test; verify from
   VS Code's MCP server list or by asking Agent Mode to call `engram_status`.
 - Workspace config at `.vscode/mcp.json` is useful for shared project setup, but user
   config is better for the installer because it follows the developer across repos.

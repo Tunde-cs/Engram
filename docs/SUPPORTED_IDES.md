@@ -2,7 +2,7 @@
 
 Engram's install script (`curl -fsSL https://engram-memory.com/install | sh`) auto-detects and configures the following IDEs. Each IDE has its own MCP config format — the installer handles the differences automatically.
 
-By default, the installer writes `https://mcp.engram.app/mcp` into each MCP config. If you need a custom endpoint, set `ENGRAM_MCP_URL` before running the installer.
+By default, the installer writes `https://www.engram-memory.com/mcp` into each MCP config. If you need a custom endpoint, set `ENGRAM_MCP_URL` before running the installer.
 
 ## Auto-configured by the installer
 
@@ -44,13 +44,13 @@ If your IDE isn't listed above but supports MCP, add Engram as a remote HTTP ser
 
 **URL:**
 ```
-https://mcp.engram.app/mcp
+https://www.engram-memory.com/mcp
 ```
 
 **With an invite key:**
 ```json
 {
-  "url": "https://mcp.engram.app/mcp",
+  "url": "https://www.engram-memory.com/mcp",
   "headers": {
     "Authorization": "Bearer YOUR_INVITE_KEY"
   }

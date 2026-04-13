@@ -191,7 +191,7 @@ class TestVerifyCommand:
                 {
                     "mcpServers": {
                         "engram": {
-                            "serverUrl": "https://mcp.engram.app/mcp",
+                            "serverUrl": "https://www.engram-memory.com/mcp",
                         }
                     }
                 }
@@ -228,7 +228,7 @@ class TestVerifyCommand:
                 {
                     "context_servers": {
                         "engram": {
-                            "url": "https://mcp.engram.app/mcp",
+                            "url": "https://www.engram-memory.com/mcp",
                         }
                     }
                 }
@@ -265,7 +265,7 @@ class TestVerifyCommand:
                     "servers": {
                         "engram": {
                             "type": "http",
-                            "url": "https://mcp.engram.app/mcp",
+                            "url": "https://www.engram-memory.com/mcp",
                         }
                     }
                 }
@@ -489,7 +489,7 @@ class TestVerifyMCPClientDetection:
                     "servers": {
                         "engram": {
                             "type": "http",
-                            "url": "https://mcp.engram.app/mcp",
+                            "url": "https://www.engram-memory.com/mcp",
                         }
                     }
                 }

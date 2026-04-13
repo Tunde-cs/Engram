@@ -74,7 +74,7 @@ _ENGRAM_MCP_ENTRY = {
 def _engram_mcp_entry_for_client(client_name: str) -> dict[str, object]:
     import os
 
-    mcp_url = os.environ.get("ENGRAM_MCP_URL", "https://mcp.engram.app/mcp")
+    mcp_url = os.environ.get("ENGRAM_MCP_URL", "https://www.engram-memory.com/mcp")
 
     if client_name == "Windsurf":
         return {"serverUrl": mcp_url}

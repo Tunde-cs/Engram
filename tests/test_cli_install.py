@@ -27,7 +27,7 @@ def test_install_writes_windsurf_server_url(tmp_path, monkeypatch):
     runner = CliRunner()
     workspace_path = tmp_path / ".engram" / "workspace.json"
 
-    monkeypatch.setenv("ENGRAM_MCP_URL", "https://mcp.engram.app/mcp")
+    monkeypatch.setenv("ENGRAM_MCP_URL", "https://www.engram-memory.com/mcp")
 
     with (
         patch("pathlib.Path.home", return_value=tmp_path),
@@ -45,14 +45,14 @@ def test_install_writes_windsurf_server_url(tmp_path, monkeypatch):
         data = json.loads(windsurf_config.read_text())
         assert "mcpServers" in data
         assert "engram" in data["mcpServers"]
-        assert data["mcpServers"]["engram"] == {"serverUrl": "https://mcp.engram.app/mcp"}
+        assert data["mcpServers"]["engram"] == {"serverUrl": "https://www.engram-memory.com/mcp"}
 
 
 def test_install_writes_zed_context_server_url(tmp_path, monkeypatch):
     runner = CliRunner()
     workspace_path = tmp_path / ".engram" / "workspace.json"
 
-    monkeypatch.setenv("ENGRAM_MCP_URL", "https://mcp.engram.app/mcp")
+    monkeypatch.setenv("ENGRAM_MCP_URL", "https://www.engram-memory.com/mcp")
 
     with (
         patch("pathlib.Path.home", return_value=tmp_path),
@@ -70,7 +70,7 @@ def test_install_writes_zed_context_server_url(tmp_path, monkeypatch):
         data = json.loads(zed_config.read_text())
         assert "context_servers" in data
         assert "engram" in data["context_servers"]
-        assert data["context_servers"]["engram"] == {"url": "https://mcp.engram.app/mcp"}
+        assert data["context_servers"]["engram"] == {"url": "https://www.engram-memory.com/mcp"}
 
 
 def test_install_writes_vscode_copilot_http_server(tmp_path, monkeypatch):
@@ -78,7 +78,7 @@ def test_install_writes_vscode_copilot_http_server(tmp_path, monkeypatch):
     workspace_path = tmp_path / ".engram" / "workspace.json"
     rebased = _rebased_mcp_clients(tmp_path)
 
-    monkeypatch.setenv("ENGRAM_MCP_URL", "https://mcp.engram.app/mcp")
+    monkeypatch.setenv("ENGRAM_MCP_URL", "https://www.engram-memory.com/mcp")
 
     with (
         patch("pathlib.Path.home", return_value=tmp_path),
@@ -98,5 +98,5 @@ def test_install_writes_vscode_copilot_http_server(tmp_path, monkeypatch):
         assert "engram" in data["servers"]
         assert data["servers"]["engram"] == {
             "type": "http",
-            "url": "https://mcp.engram.app/mcp",
+            "url": "https://www.engram-memory.com/mcp",
         }

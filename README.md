@@ -41,7 +41,7 @@ irm https://engram-memory.com/install.ps1 | iex
 curl -fsSL https://engram-memory.com/install.cmd -o install.cmd && install.cmd && del install.cmd
 ```
 
-By default, the installer writes `https://mcp.engram.app/mcp` into your MCP config. If your environment needs a different endpoint, set `ENGRAM_MCP_URL` before running the installer.
+By default, the installer writes `https://www.engram-memory.com/mcp` into your MCP config. If your environment needs a different endpoint, set `ENGRAM_MCP_URL` before running the installer.
 
 Restart your editor, then ask your agent:
 ```

@@ -22,7 +22,7 @@ The installer automatically sets up the mcp-remote bridge.
   "mcpServers": {
     "engram": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.engram.app/mcp"]
+      "args": ["-y", "mcp-remote", "https://www.engram-memory.com/mcp"]
     }
   }
 }

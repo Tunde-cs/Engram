@@ -16,7 +16,7 @@ curl -fsSL https://engram-memory.com/install | sh
 {
   "mcpServers": {
     "engram": {
-      "serverUrl": "https://mcp.engram.app/mcp"
+      "serverUrl": "https://www.engram-memory.com/mcp"
     }
   }
 }
