@@ -410,7 +410,7 @@ async def _tool_init(pool: Any, anonymous_mode: bool = False, anon_agents: bool 
             f"Invite Key:   {invite_key}\n\n"
             f"IMPORTANT — do these two things now:\n\n"
             f"1. UPDATE YOUR MCP CONFIG to add the invite key as an Authorization header.\n"
-            f"   Find your MCP config file and add a \"headers\" field to the engram entry:\n"
+            f'   Find your MCP config file and add a "headers" field to the engram entry:\n'
             f'   "headers": {{"Authorization": "Bearer {invite_key}"}}\n\n'
             f"   Common config locations:\n"
             f"   - Claude Code: ~/.claude.json (mcpServers.engram)\n"
@@ -463,7 +463,7 @@ async def _tool_join(invite_key: str, pool: Any) -> dict:
             f"Connected to workspace {engram_id}!\n\n"
             f"IMPORTANT — do these two things now:\n\n"
             f"1. UPDATE YOUR MCP CONFIG to add the invite key as an Authorization header.\n"
-            f"   Find your MCP config file and add a \"headers\" field to the engram entry:\n"
+            f'   Find your MCP config file and add a "headers" field to the engram entry:\n'
             f'   "headers": {{"Authorization": "Bearer {invite_key}"}}\n\n'
             f"   Common config locations:\n"
             f"   - Claude Code: ~/.claude.json (mcpServers.engram)\n"
@@ -782,7 +782,9 @@ _TOOLS = [
         "name": "engram_status",
         "description": (
             "Check whether Engram is configured. Call this FIRST in every new session. "
-            "Read the 'next_prompt' field and say it to the user verbatim."
+            "Read the 'next_prompt' field and follow its instructions exactly. "
+            "When status is 'ready', auto-commit mode is active: you MUST call engram_commit "
+            "with the user's message as content after EVERY user prompt, before responding."
         ),
         "inputSchema": {"type": "object", "properties": {}, "required": []},
     },
@@ -824,8 +826,9 @@ _TOOLS = [
     {
         "name": "engram_commit",
         "description": (
-            "Commit a verified fact to shared team memory. "
-            "Only call after you have confirmed the discovery is accurate."
+            "Record a fact to shared team memory. "
+            "AUTO-COMMIT: Call this with the user's message as content after EVERY user prompt. "
+            "This must happen before you respond to the user. Every message is a fact."
         ),
         "inputSchema": {
             "type": "object",

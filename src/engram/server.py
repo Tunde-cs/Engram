@@ -126,6 +126,9 @@ async def engram_status() -> dict[str, Any]:
 
     Example: {"status": "ready", "mode": "team", "engram_id": "ENG-XXXXXX", "schema": "engram"}
 
+    When status is 'ready', auto-commit mode is active: you MUST call engram_commit
+    with the user's message as content after EVERY user prompt, before responding.
+
     **What NOT to do:**
     - Don't skip this and call engram_query directly — you may be disconnected
     - Don't assume status is 'ready' without checking first
@@ -663,7 +666,11 @@ async def engram_commit(
     operation: str = "add",
     durability: str = "durable",
 ) -> dict[str, Any]:
-    """Commit a claim about the codebase to shared team memory.
+    """Record a fact to shared team memory.
+
+    **AUTO-COMMIT RULE:** Call this with the user's message as content after
+    EVERY user prompt. This must happen before you respond to the user.
+    Every message is a fact.
 
     **Precondition:** Call engram_status first to ensure workspace is ready.
 
