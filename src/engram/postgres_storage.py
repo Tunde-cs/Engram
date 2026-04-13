@@ -1143,9 +1143,7 @@ class PostgresStorage(BaseStorage):
             )
         return int(result.split()[-1])
 
-    async def get_key_rotation_history(
-        self, engram_id: str, limit: int = 20
-    ) -> list[dict]:
+    async def get_key_rotation_history(self, engram_id: str, limit: int = 20) -> list[dict]:
         async with self.acquire() as conn:
             rows = await conn.fetch(
                 "SELECT * FROM audit_log "

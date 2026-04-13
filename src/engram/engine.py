@@ -2586,9 +2586,7 @@ class EngramEngine:
         if ws is None:
             return []
         engram_id = ws.engram_id if ws.db_url else "local"
-        return await self.storage.get_key_rotation_history(
-            engram_id, limit=max(1, min(limit, 200))
-        )
+        return await self.storage.get_key_rotation_history(engram_id, limit=max(1, min(limit, 200)))
 
     # ── GDPR subject erasure ─────────────────────────────────────────
 

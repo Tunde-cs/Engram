@@ -1859,7 +1859,9 @@ def invite_rotate(
 
         db_url = ws.db_url
         if not db_url:
-            raise click.ClickException("No team database configured. Key rotation requires team mode.")
+            raise click.ClickException(
+                "No team database configured. Key rotation requires team mode."
+            )
 
         if db_url.startswith("postgres"):
             from engram.postgres_storage import PostgresStorage
@@ -1954,7 +1956,9 @@ def invite_history(limit: int) -> None:
                     extra = json.loads(extra)
                 except Exception:
                     extra = {}
-            click.echo(f"  {entry.get('timestamp', 'unknown')} — generation {extra.get('old_generation', '?')} → {extra.get('new_generation', '?')}")
+            click.echo(
+                f"  {entry.get('timestamp', 'unknown')} — generation {extra.get('old_generation', '?')} → {extra.get('new_generation', '?')}"
+            )
             if extra.get("reason"):
                 click.echo(f"    reason  : {extra['reason']}")
             click.echo(f"    actor   : {extra.get('actor', 'unknown')}")

@@ -126,7 +126,9 @@ async def test_revoke_with_grace_grace_until_in_future(storage: Storage):
     # SQLite stores naive timestamps; compare as naive UTC.
     # SQLite stores naive UTC timestamps; compare naive-to-naive.
     grace_until = datetime.fromisoformat(grace_until_str)
-    assert grace_until > datetime.now(timezone.utc).replace(tzinfo=None), "grace_until must be in the future"
+    assert grace_until > datetime.now(timezone.utc).replace(tzinfo=None), (
+        "grace_until must be in the future"
+    )
 
 
 async def test_get_active_grace_until_returns_future_ts(storage: Storage):
@@ -140,7 +142,9 @@ async def test_get_active_grace_until_returns_future_ts(storage: Storage):
     # SQLite returns naive timestamps; strip tz info for comparison.
     grace_str = grace_until.replace("+00:00", "").rstrip("Z")
     grace_dt = datetime.fromisoformat(grace_str)
-    assert grace_dt > datetime.now(timezone.utc).replace(tzinfo=None), "Returned grace_until must be in the future"
+    assert grace_dt > datetime.now(timezone.utc).replace(tzinfo=None), (
+        "Returned grace_until must be in the future"
+    )
 
 
 async def test_get_active_grace_until_none_when_no_revoked_keys(storage: Storage):
@@ -210,9 +214,7 @@ async def test_immediate_revoke_hard_deletes_keys(storage: Storage):
 
     await storage.revoke_all_invite_keys(ENGRAM_ID_A, grace_minutes=0)
 
-    cursor = await storage.db.execute(
-        "SELECT key_hash FROM invite_keys WHERE key_hash = ?", (kh,)
-    )
+    cursor = await storage.db.execute("SELECT key_hash FROM invite_keys WHERE key_hash = ?", (kh,))
     row = await cursor.fetchone()
     assert row is None, "Immediate revocation must hard-delete the key row"
 
@@ -244,9 +246,7 @@ async def test_cleanup_expired_grace_keys_removes_expired_rows(storage: Storage)
     deleted = await storage.cleanup_expired_grace_keys(ENGRAM_ID_A)
 
     assert deleted == 1
-    cursor = await storage.db.execute(
-        "SELECT key_hash FROM invite_keys WHERE key_hash = ?", (kh,)
-    )
+    cursor = await storage.db.execute("SELECT key_hash FROM invite_keys WHERE key_hash = ?", (kh,))
     assert await cursor.fetchone() is None
 
 
@@ -297,8 +297,16 @@ async def test_get_key_rotation_history_returns_entries(storage: Storage):
 
     assert len(entries) == 2
     # Newest first
-    extra_0 = json.loads(entries[0]["extra"]) if isinstance(entries[0]["extra"], str) else entries[0]["extra"]
-    extra_1 = json.loads(entries[1]["extra"]) if isinstance(entries[1]["extra"], str) else entries[1]["extra"]
+    extra_0 = (
+        json.loads(entries[0]["extra"])
+        if isinstance(entries[0]["extra"], str)
+        else entries[0]["extra"]
+    )
+    extra_1 = (
+        json.loads(entries[1]["extra"])
+        if isinstance(entries[1]["extra"], str)
+        else entries[1]["extra"]
+    )
     assert extra_0["new_generation"] > extra_1["new_generation"]
 
 

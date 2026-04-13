@@ -327,9 +327,7 @@ class BaseStorage(ABC):
         """
         return 0
 
-    async def get_key_rotation_history(
-        self, engram_id: str, limit: int = 20
-    ) -> list[dict]:
+    async def get_key_rotation_history(self, engram_id: str, limit: int = 20) -> list[dict]:
         """Return audit_log entries with operation='key_rotation' for the workspace.
 
         Ordered by timestamp descending. Default empty list for local mode.
@@ -1552,9 +1550,7 @@ class SQLiteStorage(BaseStorage):
         await self.db.commit()
         return cursor.rowcount
 
-    async def get_key_rotation_history(
-        self, engram_id: str, limit: int = 20
-    ) -> list[dict]:
+    async def get_key_rotation_history(self, engram_id: str, limit: int = 20) -> list[dict]:
         # In SQLite mode workspace_id in audit_log is self.workspace_id, not engram_id.
         cursor = await self.db.execute(
             """SELECT * FROM audit_log
